@@ -232,6 +232,70 @@ export interface Database {
                     created_at?: string;
                 };
             };
+            trip_todos: {
+                Row: {
+                    id: string;
+                    trip_id: string;
+                    title: string;
+                    is_completed: boolean;
+                    assigned_to: string[] | null;
+                    completed_by: string[];
+                    created_by: string | null;
+                    created_at: string;
+                    updated_at: string;
+                };
+                Insert: {
+                    id?: string;
+                    trip_id: string;
+                    title: string;
+                    is_completed?: boolean;
+                    assigned_to?: string[] | null;
+                    completed_by?: string[];
+                    created_by?: string | null;
+                    created_at?: string;
+                    updated_at?: string;
+                };
+                Update: {
+                    id?: string;
+                    trip_id?: string;
+                    title?: string;
+                    is_completed?: boolean;
+                    assigned_to?: string[] | null;
+                    completed_by?: string[];
+                    created_by?: string | null;
+                    created_at?: string;
+                    updated_at?: string;
+                };
+            },
+            trip_memos: {
+                Row: {
+                    id: string;
+                    trip_id: string;
+                    title: string;
+                    content: string | null;
+                    created_by: string | null;
+                    created_at: string;
+                    updated_at: string;
+                };
+                Insert: {
+                    id?: string;
+                    trip_id: string;
+                    title: string;
+                    content?: string | null;
+                    created_by?: string | null;
+                    created_at?: string;
+                    updated_at?: string;
+                };
+                Update: {
+                    id?: string;
+                    trip_id?: string;
+                    title?: string;
+                    content?: string | null;
+                    created_by?: string | null;
+                    created_at?: string;
+                    updated_at?: string;
+                };
+            },
             expenses: {
                 Row: {
                     id: string;

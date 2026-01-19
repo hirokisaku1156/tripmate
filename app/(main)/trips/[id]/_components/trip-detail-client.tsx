@@ -5,7 +5,7 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ItineraryTab } from "./itinerary-tab";
-import { PlacesTab } from "./places-tab";
+import { TodoTab } from "./todo-tab";
 import { MembersTab } from "./members-tab";
 import { ExpensesTab } from "./expenses-tab";
 import type { Database } from "@/lib/supabase/types";
@@ -15,7 +15,8 @@ type TripMember = Database["public"]["Tables"]["trip_members"]["Row"] & {
     profiles: { id: string; display_name: string } | null;
 };
 type ItineraryItem = Database["public"]["Tables"]["itinerary_items"]["Row"];
-type Place = Database["public"]["Tables"]["places"]["Row"];
+type Todo = Database["public"]["Tables"]["trip_todos"]["Row"];
+type Memo = Database["public"]["Tables"]["trip_memos"]["Row"];
 type Expense = Database["public"]["Tables"]["expenses"]["Row"];
 type ExpenseSplit = Database["public"]["Tables"]["expense_splits"]["Row"];
 
@@ -23,7 +24,8 @@ interface TripDetailClientProps {
     trip: any;
     members: any[];
     itineraryItems: any[];
-    places: any[];
+    todos: Todo[];
+    memos: Memo[];
     expenses: any[];
     expenseSplits: any[];
     chatSessions: any[];
@@ -36,7 +38,8 @@ export function TripDetailClient({
     trip,
     members,
     itineraryItems,
-    places,
+    todos,
+    memos,
     expenses,
     expenseSplits,
     chatSessions,
@@ -117,22 +120,22 @@ export function TripDetailClient({
                             🗓️ 旅程
                         </TabsTrigger>
                         <TabsTrigger
-                            value="places"
+                            value="expenses"
                             className="rounded-none border-b-2 border-transparent data-[state=active]:border-blue-500 data-[state=active]:bg-transparent px-4 py-3"
                         >
-                            📍 場所
+                            💰 費用
+                        </TabsTrigger>
+                        <TabsTrigger
+                            value="todos"
+                            className="rounded-none border-b-2 border-transparent data-[state=active]:border-blue-500 data-[state=active]:bg-transparent px-4 py-3"
+                        >
+                            📝 Todo & メモ
                         </TabsTrigger>
                         <TabsTrigger
                             value="members"
                             className="rounded-none border-b-2 border-transparent data-[state=active]:border-blue-500 data-[state=active]:bg-transparent px-4 py-3"
                         >
                             👥 メンバー
-                        </TabsTrigger>
-                        <TabsTrigger
-                            value="expenses"
-                            className="rounded-none border-b-2 border-transparent data-[state=active]:border-blue-500 data-[state=active]:bg-transparent px-4 py-3"
-                        >
-                            💰 費用
                         </TabsTrigger>
                     </TabsList>
 
@@ -151,19 +154,6 @@ export function TripDetailClient({
                         />
                     </TabsContent>
 
-                    <TabsContent value="places" className="px-4 py-4">
-                        <PlacesTab tripId={trip.id} places={places} />
-                    </TabsContent>
-
-                    <TabsContent value="members" className="px-4 py-4">
-                        <MembersTab
-                            tripId={trip.id}
-                            members={members}
-                            inviteCode={trip.invite_code ?? ""}
-                            isOwner={isOwner}
-                        />
-                    </TabsContent>
-
                     <TabsContent value="expenses" className="px-4 py-4">
                         <ExpensesTab
                             tripId={trip.id}
@@ -177,6 +167,35 @@ export function TripDetailClient({
                                 profiles: m.profiles
                             }))}
                             currentMemberId={currentMemberId}
+                        />
+                    </TabsContent>
+
+                    <TabsContent value="todos" className="px-4 py-4">
+                        <TodoTab
+                            tripId={trip.id}
+                            todos={todos}
+                            memos={memos}
+                            members={members.map(m => ({
+                                id: m.id,
+                                user_id: m.user_id,
+                                role: m.role,
+                                display_name_override: m.display_name_override,
+                                profiles: m.profiles,
+                                created_at: m.created_at || "",
+                                trip_id: m.trip_id,
+                                invite_token: m.invite_token,
+                                joined_at: m.joined_at
+                            }))}
+                            currentMemberId={currentMemberId}
+                        />
+                    </TabsContent>
+
+                    <TabsContent value="members" className="px-4 py-4">
+                        <MembersTab
+                            tripId={trip.id}
+                            members={members}
+                            inviteCode={trip.invite_code ?? ""}
+                            isOwner={isOwner}
                         />
                     </TabsContent>
                 </Tabs>

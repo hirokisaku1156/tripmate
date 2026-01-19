@@ -60,7 +60,7 @@ export default async function TripDetailPage({ params }: TripDetailPageProps) {
     const expenseIds = (expenses ?? []).map(e => e.id);
 
     // 残りのデータを取得
-    const [membersResult, itineraryResult, placesResult, expenseSplitsResult] = await Promise.all([
+    const [membersResult, itineraryResult, todosResult, memosResult, expenseSplitsResult] = await Promise.all([
         supabase
             .from("trip_members")
             .select(`
@@ -78,7 +78,12 @@ export default async function TripDetailPage({ params }: TripDetailPageProps) {
             .order("date", { ascending: true })
             .order("start_time", { ascending: true }),
         supabase
-            .from("places")
+            .from("trip_todos")
+            .select("*")
+            .eq("trip_id", id)
+            .order("created_at", { ascending: false }),
+        supabase
+            .from("trip_memos")
             .select("*")
             .eq("trip_id", id)
             .order("created_at", { ascending: false }),
@@ -99,8 +104,11 @@ export default async function TripDetailPage({ params }: TripDetailPageProps) {
     if (itineraryResult.error) {
         console.error("Itinerary fetch error:", itineraryResult.error);
     }
-    if (placesResult.error) {
-        console.error("Places fetch error:", placesResult.error);
+    if (todosResult.error) {
+        console.error("Todos fetch error:", todosResult.error);
+    }
+    if (memosResult.error) {
+        console.error("Memos fetch error:", memosResult.error);
     }
     // フィルタリング済みデータを使用
     const filteredSplits = expenseSplitsResult.data ?? [];
@@ -110,7 +118,8 @@ export default async function TripDetailPage({ params }: TripDetailPageProps) {
             trip={trip}
             members={membersResult.data ?? []}
             itineraryItems={itineraryResult.data ?? []}
-            places={placesResult.data ?? []}
+            todos={todosResult.data ?? []}
+            memos={memosResult.data ?? []}
             expenses={expenses ?? []}
             expenseSplits={filteredSplits}
             chatSessions={chatSessions}
