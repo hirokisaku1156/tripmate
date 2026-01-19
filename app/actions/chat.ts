@@ -28,7 +28,7 @@ export async function sendMessage(tripId: string, message: string, context: any,
         .eq("trip_id", tripId)
         .order("created_at", { ascending: true });
 
-    // 3. Geminiで回答生成 (より安定した1.5 Flashに変更)
+    // 3. Geminiで回答生成 (安定版 1.5 Flash を使用)
     const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
     const systemPrompt = `あなたは旅行アシスタントです。ユーザーの旅行をサポートしてください。
