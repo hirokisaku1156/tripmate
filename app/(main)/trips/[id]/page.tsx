@@ -46,8 +46,8 @@ export default async function TripDetailPage({ params }: TripDetailPageProps) {
     const trip = tripResult.data;
     const member = memberResult.data;
 
-    // 残りのデータを並列で取得
-    const [membersResult, itineraryResult, placesResult] = await Promise.all([
+    // 残りのデータを並列で取得（費用データを追加）
+    const [membersResult, itineraryResult, placesResult, expensesResult, expenseSplitsResult] = await Promise.all([
         supabase
             .from("trip_members")
             .select(`
@@ -69,6 +69,14 @@ export default async function TripDetailPage({ params }: TripDetailPageProps) {
             .select("*")
             .eq("trip_id", id)
             .order("created_at", { ascending: false }),
+        supabase
+            .from("expenses")
+            .select("*")
+            .eq("trip_id", id)
+            .order("date", { ascending: false }),
+        supabase
+            .from("expense_splits")
+            .select("*"),
     ]);
 
     if (membersResult.error) {
@@ -80,6 +88,15 @@ export default async function TripDetailPage({ params }: TripDetailPageProps) {
     if (placesResult.error) {
         console.error("Places fetch error:", placesResult.error);
     }
+    if (expensesResult.error) {
+        console.error("Expenses fetch error:", expensesResult.error);
+    }
+
+    // この旅行に関する expense_splits のみフィルタリング
+    const expenseIds = (expensesResult.data ?? []).map(e => e.id);
+    const filteredSplits = (expenseSplitsResult.data ?? []).filter(s =>
+        expenseIds.includes(s.expense_id)
+    );
 
     return (
         <TripDetailClient
@@ -87,6 +104,8 @@ export default async function TripDetailPage({ params }: TripDetailPageProps) {
             members={membersResult.data ?? []}
             itineraryItems={itineraryResult.data ?? []}
             places={placesResult.data ?? []}
+            expenses={expensesResult.data ?? []}
+            expenseSplits={filteredSplits}
             currentUserId={user.id}
             isOwner={member.role === "owner"}
         />

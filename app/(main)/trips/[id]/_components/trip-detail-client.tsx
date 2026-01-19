@@ -7,6 +7,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ItineraryTab } from "./itinerary-tab";
 import { PlacesTab } from "./places-tab";
 import { MembersTab } from "./members-tab";
+import { ExpensesTab } from "./expenses-tab";
 import type { Database } from "@/lib/supabase/types";
 
 type Trip = Database["public"]["Tables"]["trips"]["Row"];
@@ -15,12 +16,16 @@ type TripMember = Database["public"]["Tables"]["trip_members"]["Row"] & {
 };
 type ItineraryItem = Database["public"]["Tables"]["itinerary_items"]["Row"];
 type Place = Database["public"]["Tables"]["places"]["Row"];
+type Expense = Database["public"]["Tables"]["expenses"]["Row"];
+type ExpenseSplit = Database["public"]["Tables"]["expense_splits"]["Row"];
 
 interface TripDetailClientProps {
     trip: Trip;
     members: TripMember[];
     itineraryItems: ItineraryItem[];
     places: Place[];
+    expenses: Expense[];
+    expenseSplits: ExpenseSplit[];
     currentUserId: string;
     isOwner: boolean;
 }
@@ -30,6 +35,8 @@ export function TripDetailClient({
     members,
     itineraryItems,
     places,
+    expenses,
+    expenseSplits,
     currentUserId,
     isOwner,
 }: TripDetailClientProps) {
@@ -104,6 +111,12 @@ export function TripDetailClient({
                         >
                             👥 メンバー
                         </TabsTrigger>
+                        <TabsTrigger
+                            value="expenses"
+                            className="rounded-none border-b-2 border-transparent data-[state=active]:border-blue-500 data-[state=active]:bg-transparent px-4 py-3"
+                        >
+                            💰 費用
+                        </TabsTrigger>
                     </TabsList>
 
                     <TabsContent value="itinerary" className="px-4 py-4">
@@ -120,6 +133,16 @@ export function TripDetailClient({
                             members={members}
                             inviteCode={trip.invite_code ?? ""}
                             isOwner={isOwner}
+                        />
+                    </TabsContent>
+
+                    <TabsContent value="expenses" className="px-4 py-4">
+                        <ExpensesTab
+                            tripId={trip.id}
+                            expenses={expenses}
+                            expenseSplits={expenseSplits}
+                            members={members}
+                            currentUserId={currentUserId}
                         />
                     </TabsContent>
                 </Tabs>
