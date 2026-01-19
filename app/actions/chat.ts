@@ -28,9 +28,6 @@ export async function sendMessage(tripId: string, message: string, context: any,
         .eq("trip_id", tripId)
         .order("created_at", { ascending: true });
 
-    // 3. Geminiで回答生成 (安定版 1.5 Flash を使用)
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
-
     const systemPrompt = `あなたは旅行アシスタントです。ユーザーの旅行をサポートしてください。
 現在の旅行情報:
 - 旅行名: ${context.tripName}
@@ -46,6 +43,12 @@ ${JSON.stringify(context.places, null, 2)}
 
 これらの情報を踏まえて、具体的で実用的なアドバイスをしてください。返信は簡潔かつ親しみやすい敬語で行ってください。`;
 
+    // 3. Geminiで回答生成 (systemInstructionを使用)
+    const model = genAI.getGenerativeModel({
+        model: "gemini-1.5-flash",
+        systemInstruction: systemPrompt
+    });
+
     const chat = model.startChat({
         history: history?.map(m => ({
             role: m.role === "user" ? "user" : "model",
@@ -53,7 +56,7 @@ ${JSON.stringify(context.places, null, 2)}
         })) || [],
     });
 
-    const result = await chat.sendMessage([{ text: systemPrompt }, { text: message }]);
+    const result = await chat.sendMessage(message);
     const response = result.response.text();
 
     // 4. AIの回答を保存 (ユーザーの設定に合わせる)
