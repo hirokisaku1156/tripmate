@@ -161,7 +161,7 @@ export function ItineraryTab({ tripId, items, members, currentMemberId, tripStar
             endTime: (item.type === "hotel" && endTimeLocal) ? endTimeLocal : (endTimeLocal ? endTimeLocal.split("T")[1] : ""),
             location: item.location || "",
             notes: item.notes || "",
-            price: "",
+            price: (item as any).price?.toString() || "",
             airline: item.airline || "",
             flightNumber: item.flight_number || "",
             departureAirport: item.departure_airport || "",
@@ -171,7 +171,7 @@ export function ItineraryTab({ tripId, items, members, currentMemberId, tripStar
             confirmationNumber: item.confirmation_number || "",
             checkInDate: item.check_in_date || "",
             nights: nights,
-            autoRegisterExpense: false,
+            autoRegisterExpense: !!(item as any).expense_id,
             paidBy: currentMemberId,
             splitMembers: members.map(m => m.id),
             startTimezone: startTz,
@@ -210,12 +210,13 @@ export function ItineraryTab({ tripId, items, members, currentMemberId, tripStar
             trip_id: tripId,
             type: formData.type,
             title: formData.title,
-            date: formData.date || null,
+            date: formData.date || (formData.type === "hotel" ? formData.checkInDate : (formData.departureTime ? formData.departureTime.split("T")[0] : formData.date)) || null,
             location: formData.location || null,
             notes: formData.notes || null,
             created_by: user?.id || null,
             start_timezone: formData.startTimezone,
             end_timezone: formData.endTimezone,
+            price: formData.price ? Number(formData.price) : null,
         };
 
         // Flight以外かつHotel以外の場合の通常処理
@@ -269,29 +270,45 @@ export function ItineraryTab({ tripId, items, members, currentMemberId, tripStar
         if (error) {
             toast.error(editItemId ? "更新に失敗しました" : "追加に失敗しました", { description: error.message });
         } else {
-            // 金額が入力されており、かつ自動登録がONかつ新規作成の場合（編集時は複雑になるため一旦新規のみ）
-            if (!editItemId && formData.price && Number(formData.price) > 0 && formData.autoRegisterExpense && user) {
+            // 費用の自動登録処理（新規・編集両方対応）
+            if (formData.price && Number(formData.price) > 0 && formData.autoRegisterExpense && user) {
                 const typeInfo = ITEM_TYPES[formData.type as keyof typeof ITEM_TYPES];
-                const { data: expense, error: expenseError } = await supabase
-                    .from("expenses")
-                    .insert({
-                        trip_id: tripId,
-                        title: formData.title,
-                        amount: Number(formData.price),
-                        currency: "JPY",
-                        amount_jpy: Number(formData.price),
-                        category: typeInfo.category,
-                        description: null,
-                        paid_by: formData.paidBy,
-                        date: formData.date || formData.checkInDate || formData.departureTime?.split("T")[0] || null,
-                    })
-                    .select()
-                    .single();
+                const expenseData = {
+                    trip_id: tripId,
+                    title: formData.title,
+                    amount: Number(formData.price),
+                    currency: "JPY",
+                    amount_jpy: Number(formData.price),
+                    category: typeInfo.category,
+                    paid_by: formData.paidBy,
+                    date: formData.date || formData.checkInDate || formData.departureTime?.split("T")[0] || null,
+                };
 
-                if (!expenseError && expense) {
-                    // 選択されたメンバーを対象者として登録
+                let finalExpenseId = (savedItem as any).expense_id;
+
+                if (finalExpenseId) {
+                    // 既存の費用を更新
+                    await supabase.from("expenses").update(expenseData).eq("id", finalExpenseId);
+                } else {
+                    // 新規作成
+                    const { data: newExpense, error: expenseError } = await supabase
+                        .from("expenses")
+                        .insert(expenseData)
+                        .select()
+                        .single();
+
+                    if (!expenseError && newExpense) {
+                        finalExpenseId = newExpense.id;
+                        // 旅程アイテムに費用IDを紐付け
+                        await supabase.from("itinerary_items").update({ expense_id: finalExpenseId }).eq("id", savedItem.id);
+                    }
+                }
+
+                if (finalExpenseId) {
+                    // 割り勘対象を同期
+                    await supabase.from("expense_splits").delete().eq("expense_id", finalExpenseId);
                     const splits = formData.splitMembers.map((userId) => ({
-                        expense_id: expense.id,
+                        expense_id: finalExpenseId,
                         user_id: userId,
                     }));
                     if (splits.length > 0) {
