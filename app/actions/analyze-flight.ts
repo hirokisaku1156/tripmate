@@ -5,7 +5,7 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 const genAI = new GoogleGenerativeAI(process.env.GOOGLE_GENERATIVE_AI_API_KEY || "");
 
 export async function analyzeFlightScreenshot(base64Image: string) {
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
 
     const prompt = `この画像は航空券の予約確認画面のスクリーンショットです。
 以下の情報をJSON形式で抽出してください。値が見つからない場合は空文字列にしてください。
