@@ -28,8 +28,8 @@ export async function sendMessage(tripId: string, message: string, context: any,
         .eq("trip_id", tripId)
         .order("created_at", { ascending: true });
 
-    // 3. Geminiで回答生成
-    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+    // 3. Geminiで回答生成 (より安定した1.5 Flashに変更)
+    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
     const systemPrompt = `あなたは旅行アシスタントです。ユーザーの旅行をサポートしてください。
 現在の旅行情報:
