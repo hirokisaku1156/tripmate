@@ -945,9 +945,9 @@ export function ItineraryTab({ tripId, items, members, currentMemberId, tripStar
                                                 <div className="bg-indigo-100 dark:bg-indigo-800 p-1.5 rounded-md shrink-0">
                                                     <Hotel className="h-4 w-4" />
                                                 </div>
-                                                <div className="min-w-0 flex-1">
-                                                    <div className="text-xs font-semibold uppercase tracking-wider opacity-70">Staying at</div>
-                                                    <div className="font-bold text-sm truncate">{hotel.title}</div>
+                                                <div className="min-w-0 flex-1 py-0.5">
+                                                    <div className="text-[10px] font-semibold uppercase tracking-wider opacity-70">Staying at</div>
+                                                    <div className="font-bold text-sm leading-tight">{hotel.title}</div>
                                                 </div>
 
                                                 {/* Times for Check-in/Check-out days */}
@@ -1009,56 +1009,58 @@ export function ItineraryTab({ tripId, items, members, currentMemberId, tripStar
                                         return (
                                             <Card key={item.id} className="relative transition-all hover:shadow-lg border-l-4 border-l-blue-500 overflow-hidden">
                                                 <CardContent className="p-0">
-                                                    <div className="p-4 sm:p-5">
+                                                    <div className="p-3 sm:p-5">
                                                         <div className="flex items-start justify-between gap-2">
                                                             <div className="flex-1 min-w-0">
                                                                 {/* Time: Visible and prominent as requested */}
                                                                 {displayTime && (
-                                                                    <div className="flex items-center gap-1.5 text-blue-600 font-bold text-sm mb-2 px-2 py-0.5 bg-blue-50 dark:bg-blue-900/30 rounded-full w-fit">
-                                                                        <Clock className="h-3.5 w-3.5" />
+                                                                    <div className="flex items-center gap-1.5 text-blue-600 font-bold text-[12px] mb-1.5 px-2 py-0.5 bg-blue-50 dark:bg-blue-900/30 rounded-full w-fit">
+                                                                        <Clock className="h-3 w-3" />
                                                                         <span>{displayTime}</span>
                                                                         {displayEndTime && (
                                                                             <>
-                                                                                <ArrowRight className="h-3 w-3 mx-0.5" />
+                                                                                <ArrowRight className="h-2.5 w-2.5 mx-0.5" />
                                                                                 <span>{displayEndTime}</span>
                                                                             </>
                                                                         )}
                                                                     </div>
                                                                 )}
 
-                                                                <div className="flex items-center gap-3 mb-2">
-                                                                    <div className="w-10 h-10 rounded-xl bg-muted shrink-0 flex items-center justify-center text-2xl">
+                                                                <div className="flex items-center gap-2 mb-1.5">
+                                                                    <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-muted shrink-0 flex items-center justify-center text-xl sm:text-2xl">
                                                                         {typeInfo.emoji}
                                                                     </div>
-                                                                    <div className="flex items-center gap-2 min-w-0">
-                                                                        <h4 className="text-xl font-bold truncate leading-tight">{item.title}</h4>
-                                                                        {item.is_ai_generated && (
-                                                                            <Badge variant="outline" className="bg-blue-50 text-blue-600 border-blue-200 gap-1 shrink-0 h-5 px-1.5 text-[10px]">
-                                                                                <Bot className="h-3 w-3" /> AI
-                                                                            </Badge>
-                                                                        )}
+                                                                    <div className="flex flex-col min-w-0 flex-1">
+                                                                        <div className="flex items-center gap-2 flex-wrap">
+                                                                            <h4 className="text-base sm:text-xl font-bold leading-tight break-words">{item.title}</h4>
+                                                                            {item.is_ai_generated && (
+                                                                                <Badge variant="outline" className="bg-blue-50 text-blue-600 border-blue-200 gap-1 shrink-0 h-4 px-1 text-[9px]">
+                                                                                    <Bot className="h-3 w-3" /> AI
+                                                                                </Badge>
+                                                                            )}
+                                                                        </div>
                                                                     </div>
                                                                 </div>
 
-                                                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-y-2 mt-4 text-sm">
+                                                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-y-1.5 mt-3 text-sm">
                                                                     {item.location && (
                                                                         <div className="flex items-center gap-2 text-muted-foreground mr-4">
-                                                                            <MapPin className="h-4 w-4 shrink-0 text-blue-500" />
-                                                                            <span className="truncate">{item.location}</span>
+                                                                            <MapPin className="h-3.5 w-3.5 shrink-0 text-blue-500" />
+                                                                            <span className="truncate text-[13px]">{item.location}</span>
                                                                         </div>
                                                                     )}
 
                                                                     {item.type === "flight" && item.flight_number && (
                                                                         <div className="flex items-center gap-2 text-muted-foreground">
-                                                                            <Plane className="h-4 w-4 shrink-0 text-blue-500" />
-                                                                            <span>{item.airline} {item.flight_number}</span>
+                                                                            <Plane className="h-3.5 w-3.5 shrink-0 text-blue-500" />
+                                                                            <span className="text-[13px]">{item.airline} {item.flight_number}</span>
                                                                         </div>
                                                                     )}
 
                                                                     {item.type === "hotel" && item.check_in_date && (
                                                                         <div className="flex items-center gap-2 text-muted-foreground">
-                                                                            <Hotel className="h-4 w-4 shrink-0 text-blue-500" />
-                                                                            <span>
+                                                                            <Hotel className="h-3.5 w-3.5 shrink-0 text-blue-500" />
+                                                                            <span className="text-[13px]">
                                                                                 {new Date(item.check_in_date).toLocaleDateString("ja-JP")} 〜{" "}
                                                                                 {item.check_out_date && new Date(item.check_out_date).toLocaleDateString("ja-JP")}
                                                                             </span>
@@ -1067,9 +1069,9 @@ export function ItineraryTab({ tripId, items, members, currentMemberId, tripStar
                                                                 </div>
 
                                                                 {item.notes && (
-                                                                    <div className="mt-4 p-3 rounded-lg bg-orange-50/50 dark:bg-orange-900/10 border border-orange-100 dark:border-orange-900/30 flex gap-2">
-                                                                        <Notebook className="h-4 w-4 shrink-0 text-orange-500 mt-0.5" />
-                                                                        <p className="text-sm text-orange-800 dark:text-orange-200">{item.notes}</p>
+                                                                    <div className="mt-3 p-2 rounded-lg bg-orange-50/50 dark:bg-orange-900/10 border border-orange-100 dark:border-orange-900/30 flex gap-2">
+                                                                        <Notebook className="h-3.5 w-3.5 shrink-0 text-orange-500 mt-0.5" />
+                                                                        <p className="text-[13px] leading-relaxed text-orange-800 dark:text-orange-200">{item.notes}</p>
                                                                     </div>
                                                                 )}
                                                             </div>
