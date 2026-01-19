@@ -58,6 +58,10 @@ export function ItineraryTab({ tripId, items, members, currentUserId, tripStartD
         // Hotel specific
         checkInDate: tripStartDate ?? "",
         nights: "1",
+        // Expense options
+        autoRegisterExpense: false,
+        paidBy: currentUserId,
+        splitMembers: members.map(m => m.user_id),
     });
     const router = useRouter();
     const supabase = createClient();
@@ -104,8 +108,8 @@ export function ItineraryTab({ tripId, items, members, currentUserId, tripStartD
         if (error) {
             toast.error("追加に失敗しました", { description: error.message });
         } else {
-            // 金額が入力されていたら費用も自動登録
-            if (formData.price && Number(formData.price) > 0 && user) {
+            // 金額が入力されており、かつ自動登録がONの場合
+            if (formData.price && Number(formData.price) > 0 && formData.autoRegisterExpense && user) {
                 const typeInfo = ITEM_TYPES[formData.type as keyof typeof ITEM_TYPES];
                 const { data: expense, error: expenseError } = await supabase
                     .from("expenses")
@@ -116,19 +120,21 @@ export function ItineraryTab({ tripId, items, members, currentUserId, tripStartD
                         amount_jpy: Number(formData.price),
                         category: typeInfo.category,
                         description: formData.title,
-                        paid_by: currentUserId,
+                        paid_by: formData.paidBy,
                         date: formData.date || formData.checkInDate || formData.departureTime?.split("T")[0] || null,
                     })
                     .select()
                     .single();
 
                 if (!expenseError && expense) {
-                    // 全メンバーを対象者として登録
-                    const splits = members.map((m) => ({
+                    // 選択されたメンバーを対象者として登録
+                    const splits = formData.splitMembers.map((userId) => ({
                         expense_id: expense.id,
-                        user_id: m.user_id,
+                        user_id: userId,
                     }));
-                    await supabase.from("expense_splits").insert(splits);
+                    if (splits.length > 0) {
+                        await supabase.from("expense_splits").insert(splits);
+                    }
                 }
             }
 
@@ -152,6 +158,9 @@ export function ItineraryTab({ tripId, items, members, currentUserId, tripStartD
                 confirmationNumber: "",
                 checkInDate: "",
                 nights: "1",
+                autoRegisterExpense: false,
+                paidBy: currentUserId,
+                splitMembers: members.map(m => m.user_id),
             });
             router.refresh();
         }
@@ -322,8 +331,8 @@ export function ItineraryTab({ tripId, items, members, currentUserId, tripStartD
                                 </div>
                             )}
 
-                            {/* Common fields */}
-                            {formData.type !== "flight" && (
+                            {/* Common fields: FlightとHotel以外で日付を表示 */}
+                            {formData.type !== "flight" && formData.type !== "hotel" && (
                                 <>
                                     <div className="space-y-2">
                                         <Label htmlFor="date">日付</Label>
@@ -377,15 +386,84 @@ export function ItineraryTab({ tripId, items, members, currentUserId, tripStartD
                                 />
                             </div>
 
-                            <div className="space-y-2">
-                                <Label htmlFor="price">金額（円）- 費用に自動登録</Label>
-                                <Input
-                                    id="price"
-                                    type="number"
-                                    value={formData.price}
-                                    onChange={(e) => setFormData({ ...formData, price: e.target.value })}
-                                    placeholder="入力すると費用タブにも登録されます"
-                                />
+                            <div className="space-y-4 border rounded-lg p-4 bg-gray-50 dark:bg-gray-900/50">
+                                <div className="space-y-2">
+                                    <Label htmlFor="price">金額（円）</Label>
+                                    <Input
+                                        id="price"
+                                        type="number"
+                                        value={formData.price}
+                                        onChange={(e) => setFormData({ ...formData, price: e.target.value })}
+                                        placeholder="0"
+                                    />
+                                </div>
+
+                                <div className="flex items-center space-x-2">
+                                    <input
+                                        type="checkbox"
+                                        id="autoRegisterExpense"
+                                        checked={formData.autoRegisterExpense}
+                                        onChange={(e) => setFormData({ ...formData, autoRegisterExpense: e.target.checked })}
+                                        className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                    />
+                                    <Label htmlFor="autoRegisterExpense" className="cursor-pointer font-normal">
+                                        費用としても登録する
+                                    </Label>
+                                </div>
+
+                                {formData.autoRegisterExpense && (
+                                    <div className="space-y-4 pl-6 border-l-2 border-gray-200 dark:border-gray-700 ml-2">
+                                        <div className="space-y-2">
+                                            <Label>支払った人</Label>
+                                            <Select
+                                                value={formData.paidBy}
+                                                onValueChange={(v) => setFormData({ ...formData, paidBy: v })}
+                                            >
+                                                <SelectTrigger>
+                                                    <SelectValue />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    {members.map((member) => (
+                                                        <SelectItem key={member.user_id} value={member.user_id}>
+                                                            {member.profiles?.display_name || "不明なユーザー"}
+                                                        </SelectItem>
+                                                    ))}
+                                                </SelectContent>
+                                            </Select>
+                                        </div>
+
+                                        <div className="space-y-2">
+                                            <Label>割り勘対象</Label>
+                                            <div className="space-y-2">
+                                                {members.map((member) => (
+                                                    <div key={member.user_id} className="flex items-center space-x-2">
+                                                        <input
+                                                            type="checkbox"
+                                                            id={`split-${member.user_id}`}
+                                                            checked={formData.splitMembers.includes(member.user_id)}
+                                                            onChange={(e) => {
+                                                                const checked = e.target.checked;
+                                                                setFormData(prev => ({
+                                                                    ...prev,
+                                                                    splitMembers: checked
+                                                                        ? [...prev.splitMembers, member.user_id]
+                                                                        : prev.splitMembers.filter(id => id !== member.user_id)
+                                                                }));
+                                                            }}
+                                                            className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                                        />
+                                                        <Label
+                                                            htmlFor={`split-${member.user_id}`}
+                                                            className="cursor-pointer font-normal"
+                                                        >
+                                                            {member.profiles?.display_name || "不明なユーザー"}
+                                                        </Label>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
                             </div>
 
                             <Button type="submit" className="w-full" disabled={loading}>
