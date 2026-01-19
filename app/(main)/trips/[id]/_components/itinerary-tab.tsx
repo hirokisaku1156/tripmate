@@ -210,7 +210,11 @@ export function ItineraryTab({ tripId, items, members, currentMemberId, tripStar
             trip_id: tripId,
             type: formData.type,
             title: formData.title,
-            date: formData.date || (formData.type === "hotel" ? formData.checkInDate : (formData.departureTime ? formData.departureTime.split("T")[0] : formData.date)) || null,
+            date: (formData.type === "flight" && formData.departureTime)
+                ? formData.departureTime.split("T")[0]
+                : (formData.type === "hotel" && formData.startTime)
+                    ? formData.startTime.split("T")[0]
+                    : (formData.date || null),
             location: formData.location || null,
             notes: formData.notes || null,
             created_by: user?.id || null,
@@ -281,7 +285,11 @@ export function ItineraryTab({ tripId, items, members, currentMemberId, tripStar
                     amount_jpy: Number(formData.price),
                     category: typeInfo.category,
                     paid_by: formData.paidBy,
-                    date: formData.date || formData.checkInDate || formData.departureTime?.split("T")[0] || null,
+                    date: (formData.type === "flight" && formData.departureTime)
+                        ? formData.departureTime.split("T")[0]
+                        : (formData.type === "hotel" && formData.startTime)
+                            ? formData.startTime.split("T")[0]
+                            : (formData.date || null),
                 };
 
                 let finalExpenseId = (savedItem as any).expense_id;
@@ -604,7 +612,14 @@ export function ItineraryTab({ tripId, items, members, currentMemberId, tripStar
                                                 id="departureTime"
                                                 type="datetime-local"
                                                 value={formData.departureTime}
-                                                onChange={(e) => setFormData({ ...formData, departureTime: e.target.value })}
+                                                onChange={(e) => {
+                                                    const val = e.target.value;
+                                                    setFormData({
+                                                        ...formData,
+                                                        departureTime: val,
+                                                        date: val ? val.split("T")[0] : formData.date
+                                                    });
+                                                }}
                                             />
                                         </div>
                                         <div className="space-y-2">
