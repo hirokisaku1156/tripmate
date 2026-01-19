@@ -24,7 +24,8 @@ export default function NewTripPage() {
     const [description, setDescription] = useState("");
     const [startDate, setStartDate] = useState("");
     const [endDate, setEndDate] = useState("");
-    const [destinations, setDestinations] = useState("");
+    const [destinations, setDestinations] = useState<string[]>([]);
+    const [currentDestination, setCurrentDestination] = useState("");
     const [manualMembers, setManualMembers] = useState<string[]>([]); // 名前文字列の配列に変更
     const [currentName, setCurrentName] = useState(""); // 入力中の名前
     const [loading, setLoading] = useState(false);
@@ -41,6 +42,18 @@ export default function NewTripPage() {
 
     const removeMember = (index: number) => {
         setManualMembers(manualMembers.filter((_, i) => i !== index));
+    };
+
+    const addDestination = () => {
+        const trimmed = currentDestination.trim();
+        if (trimmed && !destinations.includes(trimmed)) {
+            setDestinations([...destinations, trimmed]);
+            setCurrentDestination("");
+        }
+    };
+
+    const removeDestination = (index: number) => {
+        setDestinations(destinations.filter((_, i) => i !== index));
     };
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -64,7 +77,7 @@ export default function NewTripPage() {
                 description: description || null,
                 start_date: startDate || null,
                 end_date: endDate || null,
-                destinations: destinations ? destinations.split(",").map(d => d.trim()) : null,
+                destinations: destinations.length > 0 ? destinations : null,
                 invite_code: inviteCode,
                 created_by: user.id,
             })
@@ -185,14 +198,42 @@ export default function NewTripPage() {
                             </div>
 
                             <div className="space-y-2">
-                                <Label htmlFor="destinations">目的地（カンマ区切り）</Label>
-                                <Input
-                                    id="destinations"
-                                    placeholder="例: 沖縄, 那覇, 石垣島"
-                                    value={destinations}
-                                    onChange={(e) => setDestinations(e.target.value)}
-                                    className="h-11"
-                                />
+                                <Label>目的地</Label>
+                                <div className="flex gap-2">
+                                    <Input
+                                        placeholder="例: 沖縄"
+                                        value={currentDestination}
+                                        onChange={(e) => setCurrentDestination(e.target.value)}
+                                        className="h-11"
+                                    />
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        onClick={addDestination}
+                                        className="h-11 px-4 border-green-200 text-green-600 hover:bg-green-50"
+                                    >
+                                        追加
+                                    </Button>
+                                </div>
+                                {destinations.length > 0 && (
+                                    <div className="flex flex-wrap gap-2 pt-2">
+                                        {destinations.map((dest, index) => (
+                                            <div
+                                                key={index}
+                                                className="flex items-center gap-1 bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-300 px-3 py-1.5 rounded-full text-sm border border-green-100 dark:border-green-800"
+                                            >
+                                                <span>📍 {dest}</span>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => removeDestination(index)}
+                                                    className="hover:text-red-500 transition-colors"
+                                                >
+                                                    ✕
+                                                </button>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
                             </div>
 
                             <div className="space-y-4 border-t pt-4">
@@ -202,12 +243,6 @@ export default function NewTripPage() {
                                         placeholder="例: 田中太郎"
                                         value={currentName}
                                         onChange={(e) => setCurrentName(e.target.value)}
-                                        onKeyDown={(e) => {
-                                            if (e.key === "Enter") {
-                                                e.preventDefault();
-                                                addMember();
-                                            }
-                                        }}
                                         className="h-11"
                                     />
                                     <Button

@@ -276,11 +276,12 @@ export function ItineraryTab({ tripId, items, members, currentMemberId, tripStar
                     .from("expenses")
                     .insert({
                         trip_id: tripId,
+                        title: formData.title,
                         amount: Number(formData.price),
                         currency: "JPY",
                         amount_jpy: Number(formData.price),
                         category: typeInfo.category,
-                        description: formData.title,
+                        description: null,
                         paid_by: formData.paidBy,
                         date: formData.date || formData.checkInDate || formData.departureTime?.split("T")[0] || null,
                     })

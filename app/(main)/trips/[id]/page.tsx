@@ -122,8 +122,6 @@ export default async function TripDetailPage({ params }: TripDetailPageProps) {
             memos={memosResult.data ?? []}
             expenses={expenses ?? []}
             expenseSplits={filteredSplits}
-            chatSessions={chatSessions}
-            initialChatMessages={initialChatMessages}
             currentUserId={user.id}
             isOwner={member.role === "owner"}
         />

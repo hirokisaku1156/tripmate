@@ -16,6 +16,7 @@ function JoinPageContent({ params }: JoinPageProps) {
     const [code, setCode] = useState<string>("");
     const [trip, setTrip] = useState<{ id: string; name: string; description: string | null } | null>(null);
     const [targetMember, setTargetMember] = useState<{ id: string; display_name_override: string | null } | null>(null);
+    const [currentUserName, setCurrentUserName] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
     const [joining, setJoining] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -28,6 +29,19 @@ function JoinPageContent({ params }: JoinPageProps) {
         const loadTrip = async () => {
             const { code: inviteCode } = await params;
             setCode(inviteCode);
+
+            // 現在のユーザー情報を取得
+            const { data: { user } } = await supabase.auth.getUser();
+            if (user) {
+                const { data: profile } = await supabase
+                    .from("profiles")
+                    .select("display_name")
+                    .eq("id", user.id)
+                    .single();
+                if (profile) {
+                    setCurrentUserName(profile.display_name);
+                }
+            }
 
             // 旅行を検索
             const { data, error } = await supabase
@@ -172,8 +186,8 @@ function JoinPageContent({ params }: JoinPageProps) {
                     </div>
                     <CardTitle className="text-xl">旅行に招待されました</CardTitle>
                     <CardDescription>
-                        {targetMember
-                            ? `${targetMember.display_name_override}として以下の旅行に参加しますか？`
+                        {targetMember && currentUserName
+                            ? `「${currentUserName}」として以下の旅行に参加しますか？`
                             : "以下の旅行に参加しますか？"
                         }
                     </CardDescription>

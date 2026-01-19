@@ -36,6 +36,7 @@ interface ExpensesTabProps {
     tripId: string;
     expenses: {
         id: string;
+        title: string | null;
         amount: number;
         currency: string;
         category: string | null;
@@ -83,6 +84,7 @@ export function ExpensesTab({
     const [loading, setLoading] = useState(false);
     const [editExpenseId, setEditExpenseId] = useState<string | null>(null);
     const [formData, setFormData] = useState({
+        title: "",
         amount: "",
         category: "food",
         description: "",
@@ -102,6 +104,7 @@ export function ExpensesTab({
             .map((s) => s.user_id);
 
         setFormData({
+            title: expense.title || "",
             amount: expense.amount.toString(),
             category: expense.category || "food",
             description: expense.description || "",
@@ -128,6 +131,10 @@ export function ExpensesTab({
     };
 
     const handleSubmit = async () => {
+        if (!formData.title) {
+            toast.error("タイトルを入力してください");
+            return;
+        }
         if (!formData.amount || Number(formData.amount) <= 0) {
             toast.error("金額を入力してください");
             return;
@@ -141,6 +148,7 @@ export function ExpensesTab({
 
         const expenseData = {
             trip_id: tripId,
+            title: formData.title || null,
             amount: Number(formData.amount),
             currency: "JPY",
             amount_jpy: Number(formData.amount),
@@ -181,6 +189,7 @@ export function ExpensesTab({
         setOpen(false);
         setEditExpenseId(null);
         setFormData({
+            title: "",
             amount: "",
             category: "food",
             description: "",
@@ -291,6 +300,7 @@ export function ExpensesTab({
                         if (!val) {
                             setEditExpenseId(null);
                             setFormData({
+                                title: "",
                                 amount: "",
                                 category: "food",
                                 description: "",
@@ -304,6 +314,7 @@ export function ExpensesTab({
                             <Button size="sm" onClick={() => {
                                 setEditExpenseId(null);
                                 setFormData({
+                                    title: "",
                                     amount: "",
                                     category: "food",
                                     description: "",
@@ -318,6 +329,17 @@ export function ExpensesTab({
                                 <DialogTitle>{editExpenseId ? "支払いを編集" : "支払いを登録"}</DialogTitle>
                             </DialogHeader>
                             <div className="space-y-4 pt-4">
+                                <div className="space-y-2">
+                                    <Label>タイトル *</Label>
+                                    <Input
+                                        placeholder="例: ランチ代"
+                                        value={formData.title}
+                                        onChange={(e) =>
+                                            setFormData({ ...formData, title: e.target.value })
+                                        }
+                                        required
+                                    />
+                                </div>
                                 <div className="space-y-2">
                                     <Label>金額（円）</Label>
                                     <Input
@@ -354,7 +376,7 @@ export function ExpensesTab({
                                 <div className="space-y-2">
                                     <Label>メモ</Label>
                                     <Input
-                                        placeholder="ランチ代など"
+                                        placeholder="店名や詳細など"
                                         value={formData.description}
                                         onChange={(e) =>
                                             setFormData({ ...formData, description: e.target.value })
@@ -460,9 +482,16 @@ export function ExpensesTab({
                                                 </div>
                                                 <div className={expense.is_settled ? "opacity-60" : ""}>
                                                     <div className="flex items-center gap-2">
-                                                        <p className="font-medium">
-                                                            {expense.description || cat.label}
-                                                        </p>
+                                                        <div className="flex flex-col">
+                                                            <p className="font-medium">
+                                                                {expense.title || expense.description || cat.label}
+                                                            </p>
+                                                            {expense.title && expense.description && (
+                                                                <p className="text-[11px] text-muted-foreground line-clamp-1">
+                                                                    {expense.description}
+                                                                </p>
+                                                            )}
+                                                        </div>
                                                         {expense.is_ai_generated && (
                                                             <Badge variant="outline" className="bg-blue-50 text-blue-600 border-blue-200 gap-1 shrink-0 h-5 px-1.5 text-[10px]">
                                                                 <Bot className="h-3 w-3" /> AI

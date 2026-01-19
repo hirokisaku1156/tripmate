@@ -110,47 +110,46 @@ export function MembersTab({ tripId, members, inviteCode, isOwner }: MembersTabP
                             リンクをシェアして友達を招待しましょう
                         </CardDescription>
                     </div>
-                    {isOwner && (
-                        <Dialog open={dialogOpen} onOpenChange={(val) => {
-                            setDialogOpen(val);
-                            if (!val) {
+                    {/* メンバー手動追加ダイアログ */}
+                    <Dialog open={dialogOpen} onOpenChange={(val) => {
+                        setDialogOpen(val);
+                        if (!val) {
+                            setEditMemberId(null);
+                            setNewName("");
+                        }
+                    }}>
+                        <DialogTrigger asChild>
+                            <Button size="sm" variant="outline" onClick={() => {
                                 setEditMemberId(null);
                                 setNewName("");
-                            }
-                        }}>
-                            <DialogTrigger asChild>
-                                <Button size="sm" variant="outline" onClick={() => {
-                                    setEditMemberId(null);
-                                    setNewName("");
-                                }}>
-                                    + 手動で追加
+                            }}>
+                                + 手動で追加
+                            </Button>
+                        </DialogTrigger>
+                        <DialogContent>
+                            <DialogHeader>
+                                <DialogTitle>{editMemberId ? "メンバーを編集" : "メンバーを手動で追加"}</DialogTitle>
+                                <DialogDescription>
+                                    {editMemberId ? "メンバーの情報を修正します" : "名前を入力してメンバーを追加します。後で個別招待リンクを送ることもできます。"}
+                                </DialogDescription>
+                            </DialogHeader>
+                            <form onSubmit={handleAddMember} className="space-y-4 pt-4">
+                                <div className="space-y-2">
+                                    <Label htmlFor="memberName">名前</Label>
+                                    <Input
+                                        id="memberName"
+                                        value={newName}
+                                        onChange={(e) => setNewName(e.target.value)}
+                                        placeholder="例：田中太郎"
+                                        required
+                                    />
+                                </div>
+                                <Button type="submit" className="w-full" disabled={loading}>
+                                    {loading ? (editMemberId ? "更新中..." : "追加中...") : (editMemberId ? "更新する" : "追加する")}
                                 </Button>
-                            </DialogTrigger>
-                            <DialogContent>
-                                <DialogHeader>
-                                    <DialogTitle>{editMemberId ? "メンバーを編集" : "メンバーを手動で追加"}</DialogTitle>
-                                    <DialogDescription>
-                                        {editMemberId ? "メンバーの情報を修正します" : "名前を入力してメンバーを追加します。後で個別招待リンクを送ることもできます。"}
-                                    </DialogDescription>
-                                </DialogHeader>
-                                <form onSubmit={handleAddMember} className="space-y-4 pt-4">
-                                    <div className="space-y-2">
-                                        <Label htmlFor="memberName">名前</Label>
-                                        <Input
-                                            id="memberName"
-                                            value={newName}
-                                            onChange={(e) => setNewName(e.target.value)}
-                                            placeholder="例：田中太郎"
-                                            required
-                                        />
-                                    </div>
-                                    <Button type="submit" className="w-full" disabled={loading}>
-                                        {loading ? (editMemberId ? "更新中..." : "追加中...") : (editMemberId ? "更新する" : "追加する")}
-                                    </Button>
-                                </form>
-                            </DialogContent>
-                        </Dialog>
-                    )}
+                            </form>
+                        </DialogContent>
+                    </Dialog>
                 </CardHeader>
                 <CardContent className="space-y-4">
                     <div className="flex gap-2">
@@ -200,7 +199,8 @@ export function MembersTab({ tripId, members, inviteCode, isOwner }: MembersTabP
                                                 )}
                                             </div>
                                         </div>
-                                        {isOwner && member.role !== "owner" && (
+                                        {/* メンバー編集・削除メニュー（オーナー以外のメンバーに対して） */}
+                                        {member.role !== "owner" && (
                                             <DropdownMenu>
                                                 <DropdownMenuTrigger asChild>
                                                     <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full">
@@ -225,7 +225,8 @@ export function MembersTab({ tripId, members, inviteCode, isOwner }: MembersTabP
                                             </DropdownMenu>
                                         )}
                                     </div>
-                                    {isManual && isOwner && (
+                                    {/* 個別招待リンク（手動追加メンバーのみ） */}
+                                    {isManual && (
                                         <div className="flex gap-2 mt-1">
                                             <Button
                                                 size="sm"

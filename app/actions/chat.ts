@@ -303,11 +303,12 @@ ${JSON.stringify(context.places, null, 2)}
                     if (toolArgs.price && toolArgs.price > 0) {
                         await supabase.from("expenses").insert({
                             trip_id: tripId,
+                            title: toolArgs.title,
                             amount: toolArgs.price,
                             currency: "JPY",
                             amount_jpy: toolArgs.price,
                             category: toolArgs.type || "other",
-                            description: toolArgs.title,
+                            description: null,
                             date: toolArgs.date,
                             is_ai_generated: true
                         });
@@ -315,10 +316,11 @@ ${JSON.stringify(context.places, null, 2)}
                 } else if (name === "add_expense") {
                     const { error } = await supabase.from("expenses").insert({
                         trip_id: tripId,
+                        title: toolArgs.title || toolArgs.description,
                         amount: toolArgs.amount,
                         currency: "JPY",
                         amount_jpy: toolArgs.amount,
-                        description: toolArgs.description,
+                        description: toolArgs.description || null,
                         category: toolArgs.category || "other",
                         date: toolArgs.date,
                         is_ai_generated: true

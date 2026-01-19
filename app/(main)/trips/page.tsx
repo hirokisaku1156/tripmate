@@ -1,9 +1,8 @@
 import { createClient } from "@/lib/supabase/server";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { LogoutButton } from "./_components/logout-button";
+import { TripListClient } from "./_components/trip-list-client";
 
 interface TripData {
     id: string;
@@ -90,64 +89,7 @@ export default async function TripsPage() {
                     </Link>
                 </div>
 
-                {trips.length === 0 ? (
-                    <Card className="border-dashed border-2">
-                        <CardContent className="py-12 text-center">
-                            <div className="w-16 h-16 mx-auto mb-4 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center">
-                                <span className="text-3xl">🌏</span>
-                            </div>
-                            <h3 className="text-lg font-medium mb-2">旅行がありません</h3>
-                            <p className="text-muted-foreground mb-4">
-                                新しい旅行を作成して、友達を招待しましょう
-                            </p>
-                            <Link href="/trips/new">
-                                <Button>旅行を作成する</Button>
-                            </Link>
-                        </CardContent>
-                    </Card>
-                ) : (
-                    <div className="space-y-4">
-                        {trips.map((trip) => (
-                            <Link key={trip?.id} href={`/trips/${trip?.id}`}>
-                                <Card className="hover:shadow-lg transition-all duration-200 cursor-pointer hover:border-blue-300 dark:hover:border-blue-700">
-                                    <CardHeader className="pb-2">
-                                        <div className="flex items-start justify-between">
-                                            <CardTitle className="text-lg">{trip?.name}</CardTitle>
-                                            {trip?.role === "owner" && (
-                                                <Badge variant="secondary" className="text-xs">
-                                                    オーナー
-                                                </Badge>
-                                            )}
-                                        </div>
-                                        {trip?.description && (
-                                            <CardDescription className="line-clamp-2">
-                                                {trip.description}
-                                            </CardDescription>
-                                        )}
-                                    </CardHeader>
-                                    <CardContent>
-                                        <div className="flex flex-wrap gap-2 text-sm text-muted-foreground">
-                                            {trip?.start_date && trip?.end_date && (
-                                                <div className="flex items-center gap-1">
-                                                    <span>📅</span>
-                                                    <span>
-                                                        {new Date(trip.start_date).toLocaleDateString("ja-JP")} - {new Date(trip.end_date).toLocaleDateString("ja-JP")}
-                                                    </span>
-                                                </div>
-                                            )}
-                                            {trip?.destinations && trip.destinations.length > 0 && (
-                                                <div className="flex items-center gap-1">
-                                                    <span>📍</span>
-                                                    <span>{trip.destinations.join(", ")}</span>
-                                                </div>
-                                            )}
-                                        </div>
-                                    </CardContent>
-                                </Card>
-                            </Link>
-                        ))}
-                    </div>
-                )}
+                <TripListClient trips={trips} />
             </main>
         </div>
     );

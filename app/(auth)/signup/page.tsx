@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useState, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -10,12 +10,14 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "sonner";
 
-export default function SignUpPage() {
+function SignUpForm() {
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
     const [displayName, setDisplayName] = useState("");
     const [loading, setLoading] = useState(false);
     const router = useRouter();
+    const searchParams = useSearchParams();
+    const redirect = searchParams.get("redirect");
     const supabase = createClient();
 
     const handleSignUp = async (e: React.FormEvent) => {
@@ -44,12 +46,16 @@ export default function SignUpPage() {
             // メール確認が無効な場合は直接ログイン状態になる
             // プロフィールはDBトリガーで自動作成される
             toast.success("登録が完了しました！");
-            router.push("/trips");
+            // redirectパラメータがあればそこに、なければ/tripsへ
+            router.push(redirect || "/trips");
             router.refresh();
         }
 
         setLoading(false);
     };
+
+    // ログインリンクにredirectパラメータを渡す
+    const loginUrl = redirect ? `/login?redirect=${encodeURIComponent(redirect)}` : "/login";
 
     return (
         <Card className="shadow-xl border-0 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm">
@@ -111,12 +117,27 @@ export default function SignUpPage() {
                     </Button>
                     <p className="text-sm text-muted-foreground">
                         すでにアカウントをお持ちの方は{" "}
-                        <Link href="/login" className="text-blue-600 hover:underline font-medium">
+                        <Link href={loginUrl} className="text-blue-600 hover:underline font-medium">
                             ログイン
                         </Link>
                     </p>
                 </CardFooter>
             </form>
         </Card>
+    );
+}
+
+export default function SignUpPage() {
+    return (
+        <Suspense fallback={
+            <Card className="shadow-xl border-0 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm">
+                <CardContent className="py-12 text-center">
+                    <div className="w-16 h-16 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+                    <p className="text-muted-foreground">読み込み中...</p>
+                </CardContent>
+            </Card>
+        }>
+            <SignUpForm />
+        </Suspense>
     );
 }
