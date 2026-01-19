@@ -38,7 +38,7 @@ export function ItineraryTab({ tripId, items, members, currentUserId, tripStartD
     const [dialogOpen, setDialogOpen] = useState(false);
     const [loading, setLoading] = useState(false);
     const [formData, setFormData] = useState({
-        type: "activity",
+        type: "",
         title: "",
         date: tripStartDate ?? "",
         startTime: "",
@@ -71,6 +71,12 @@ export function ItineraryTab({ tripId, items, members, currentUserId, tripStartD
         setLoading(true);
 
         const { data: { user } } = await supabase.auth.getUser();
+
+        if (!formData.type) {
+            toast.error("種類を選択してください");
+            setLoading(false);
+            return;
+        }
 
         const insertData: Database["public"]["Tables"]["itinerary_items"]["Insert"] = {
             trip_id: tripId,
@@ -141,9 +147,9 @@ export function ItineraryTab({ tripId, items, members, currentUserId, tripStartD
             toast.success("旅程を追加しました");
             setDialogOpen(false);
             setFormData({
-                type: "activity",
+                type: "",
                 title: "",
-                date: "",
+                date: tripStartDate ?? "",
                 startTime: "",
                 endTime: "",
                 location: "",
@@ -201,7 +207,7 @@ export function ItineraryTab({ tripId, items, members, currentUserId, tripStartD
                                 <Label>種類</Label>
                                 <Select value={formData.type} onValueChange={(v) => setFormData({ ...formData, type: v })}>
                                     <SelectTrigger>
-                                        <SelectValue />
+                                        <SelectValue placeholder="種類を選択してください" />
                                     </SelectTrigger>
                                     <SelectContent>
                                         {Object.entries(ITEM_TYPES).map(([key, { label, emoji }]) => (
