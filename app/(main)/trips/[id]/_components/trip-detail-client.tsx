@@ -233,7 +233,7 @@ export function TripDetailClient({
                         </TabsTrigger>
                     </TabsList>
 
-                    <TabsContent value="itinerary" className="px-4 py-4">
+                    <TabsContent value="itinerary" className="px-4 pt-1 pb-4">
                         <ItineraryTab
                             tripId={trip.id}
                             items={itineraryItems}
