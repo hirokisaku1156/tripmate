@@ -39,7 +39,7 @@ export function MembersTab({ tripId, members, inviteCode, isOwner }: MembersTabP
     const supabase = createClient();
 
     const inviteLink = typeof window !== "undefined"
-        ? `${window.location.origin}/join/${inviteCode}`
+        ? `${window.location.origin}/join/${inviteCode}?openExternalBrowser=1`
         : "";
 
     const copyInviteLink = async (url: string = inviteLink) => {
@@ -96,7 +96,7 @@ export function MembersTab({ tripId, members, inviteCode, isOwner }: MembersTabP
 
     const getIndividualInviteLink = (token: string | null) => {
         if (!token || typeof window === "undefined") return "";
-        return `${window.location.origin}/join/${inviteCode}?token=${token}`;
+        return `${window.location.origin}/join/${inviteCode}?token=${token}&openExternalBrowser=1`;
     };
 
     return (
@@ -157,14 +157,27 @@ export function MembersTab({ tripId, members, inviteCode, isOwner }: MembersTabP
                             {inviteLink}
                         </div>
                     </div>
-                    <Button
-                        variant="outline"
-                        className="w-full"
-                        onClick={() => copyInviteLink()}
-                        disabled={copying}
-                    >
-                        📋 全体招待リンクをコピー
-                    </Button>
+                    <div className="flex gap-2">
+                        <Button
+                            variant="outline"
+                            className="flex-1"
+                            onClick={() => copyInviteLink()}
+                            disabled={copying}
+                        >
+                            📋 全体招待リンクをコピー
+                        </Button>
+                        <Button
+                            variant="outline"
+                            className="flex-1 bg-green-50 text-green-700 hover:bg-green-100 border-green-100"
+                            onClick={() => {
+                                const text = `TripMateで一緒に旅行の計画を立てよう！このリンクから参加してね。\n${inviteLink}`;
+                                const lineUrl = `https://line.me/R/share?text=${encodeURIComponent(text)}`;
+                                window.open(lineUrl, "_blank");
+                            }}
+                        >
+                            💬 LINE
+                        </Button>
+                    </div>
                 </CardContent>
             </Card>
 
