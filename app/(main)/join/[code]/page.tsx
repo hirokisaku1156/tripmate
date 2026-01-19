@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useEffect, useState, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -12,13 +12,16 @@ interface JoinPageProps {
     params: Promise<{ code: string }>;
 }
 
-export default function JoinPage({ params }: JoinPageProps) {
+function JoinPageContent({ params }: JoinPageProps) {
     const [code, setCode] = useState<string>("");
     const [trip, setTrip] = useState<{ id: string; name: string; description: string | null } | null>(null);
+    const [targetMember, setTargetMember] = useState<{ id: string; display_name_override: string | null } | null>(null);
     const [loading, setLoading] = useState(true);
     const [joining, setJoining] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const router = useRouter();
+    const searchParams = useSearchParams();
+    const token = searchParams.get("token");
     const supabase = createClient();
 
     useEffect(() => {
@@ -37,12 +40,32 @@ export default function JoinPage({ params }: JoinPageProps) {
                 setError("招待リンクが無効です");
             } else {
                 setTrip(data);
+
+                // トークンがある場合、対象メンバーを特定
+                if (token) {
+                    const { data: memberData } = await supabase
+                        .from("trip_members")
+                        .select("id, display_name_override, user_id")
+                        .eq("invite_token", token)
+                        .eq("trip_id", data.id)
+                        .single();
+
+                    if (memberData) {
+                        if (memberData.user_id) {
+                            setError("この招待リンクはすでに使用されています");
+                        } else {
+                            setTargetMember(memberData);
+                        }
+                    } else {
+                        setError("無効な個別招待リンクです");
+                    }
+                }
             }
             setLoading(false);
         };
 
         loadTrip();
-    }, [params, supabase]);
+    }, [params, supabase, token]);
 
     const handleJoin = async () => {
         setJoining(true);
@@ -50,8 +73,11 @@ export default function JoinPage({ params }: JoinPageProps) {
         const { data: { user } } = await supabase.auth.getUser();
 
         if (!user) {
-            // 未ログインの場合、ログインページへ（招待コードを保持）
-            router.push(`/login?redirect=/join/${code}`);
+            // 未ログインの場合、ログインページへ（招待コードとトークンを保持）
+            const redirectUrl = token
+                ? `/join/${code}?token=${token}`
+                : `/join/${code}`;
+            router.push(`/login?redirect=${encodeURIComponent(redirectUrl)}`);
             return;
         }
 
@@ -71,20 +97,35 @@ export default function JoinPage({ params }: JoinPageProps) {
             return;
         }
 
-        // メンバーとして参加
-        const { error } = await supabase
-            .from("trip_members")
-            .insert({
-                trip_id: trip.id,
-                user_id: user.id,
-                role: "member",
-            });
+        if (targetMember) {
+            // 個別招待トークンがある場合、既存のレコードに紐付ける
+            const { error } = await supabase
+                .from("trip_members")
+                .update({ user_id: user.id })
+                .eq("id", targetMember.id);
 
-        if (error) {
-            toast.error("参加に失敗しました", { description: error.message });
+            if (error) {
+                toast.error("リンクに失敗しました", { description: error.message });
+            } else {
+                toast.success(`${targetMember.display_name_override || "メンバー"}として参加しました！`);
+                router.push(`/trips/${trip.id}`);
+            }
         } else {
-            toast.success("旅行に参加しました！");
-            router.push(`/trips/${trip.id}`);
+            // 通常の参加処理
+            const { error } = await supabase
+                .from("trip_members")
+                .insert({
+                    trip_id: trip.id,
+                    user_id: user.id,
+                    role: "member",
+                });
+
+            if (error) {
+                toast.error("参加に失敗しました", { description: error.message });
+            } else {
+                toast.success("旅行に参加しました！");
+                router.push(`/trips/${trip.id}`);
+            }
         }
 
         setJoining(false);
@@ -109,7 +150,7 @@ export default function JoinPage({ params }: JoinPageProps) {
                         <div className="w-16 h-16 mx-auto mb-4 bg-red-100 dark:bg-red-900/20 rounded-full flex items-center justify-center">
                             <span className="text-3xl">❌</span>
                         </div>
-                        <h3 className="text-lg font-medium mb-2">招待リンクが無効です</h3>
+                        <h3 className="text-lg font-medium mb-2">{error || "招待リンクが無効です"}</h3>
                         <p className="text-muted-foreground mb-4">
                             リンクが間違っているか、期限切れの可能性があります
                         </p>
@@ -131,7 +172,10 @@ export default function JoinPage({ params }: JoinPageProps) {
                     </div>
                     <CardTitle className="text-xl">旅行に招待されました</CardTitle>
                     <CardDescription>
-                        以下の旅行に参加しますか？
+                        {targetMember
+                            ? `${targetMember.display_name_override}として以下の旅行に参加しますか？`
+                            : "以下の旅行に参加しますか？"
+                        }
                     </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-6">
@@ -156,5 +200,20 @@ export default function JoinPage({ params }: JoinPageProps) {
                 </CardContent>
             </Card>
         </div>
+    );
+}
+
+export default function JoinPage({ params }: JoinPageProps) {
+    return (
+        <Suspense fallback={
+            <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-white to-indigo-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 p-4">
+                <div className="text-center">
+                    <div className="w-16 h-16 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+                    <p className="text-muted-foreground">読み込み中...</p>
+                </div>
+            </div>
+        }>
+            <JoinPageContent params={params} />
+        </Suspense>
     );
 }

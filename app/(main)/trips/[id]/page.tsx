@@ -46,8 +46,21 @@ export default async function TripDetailPage({ params }: TripDetailPageProps) {
     const trip = tripResult.data;
     const member = memberResult.data;
 
-    // 残りのデータを並列で取得（費用データを追加）
-    const [membersResult, itineraryResult, placesResult, expensesResult, expenseSplitsResult] = await Promise.all([
+    // 費用データを先に取得
+    const { data: expenses, error: expensesError } = await supabase
+        .from("expenses")
+        .select("*")
+        .eq("trip_id", id)
+        .order("date", { ascending: false });
+
+    if (expensesError) {
+        console.error("Expenses fetch error:", expensesError);
+    }
+
+    const expenseIds = (expenses ?? []).map(e => e.id);
+
+    // 残りのデータを取得
+    const [membersResult, itineraryResult, placesResult, expenseSplitsResult] = await Promise.all([
         supabase
             .from("trip_members")
             .select(`
@@ -69,14 +82,12 @@ export default async function TripDetailPage({ params }: TripDetailPageProps) {
             .select("*")
             .eq("trip_id", id)
             .order("created_at", { ascending: false }),
-        supabase
-            .from("expenses")
-            .select("*")
-            .eq("trip_id", id)
-            .order("date", { ascending: false }),
-        supabase
-            .from("expense_splits")
-            .select("*"),
+        expenseIds.length > 0
+            ? supabase
+                .from("expense_splits")
+                .select("*")
+                .in("expense_id", expenseIds)
+            : Promise.resolve({ data: [], error: null }),
     ]);
 
     if (membersResult.error) {
@@ -88,15 +99,8 @@ export default async function TripDetailPage({ params }: TripDetailPageProps) {
     if (placesResult.error) {
         console.error("Places fetch error:", placesResult.error);
     }
-    if (expensesResult.error) {
-        console.error("Expenses fetch error:", expensesResult.error);
-    }
-
-    // この旅行に関する expense_splits のみフィルタリング
-    const expenseIds = (expensesResult.data ?? []).map(e => e.id);
-    const filteredSplits = (expenseSplitsResult.data ?? []).filter(s =>
-        expenseIds.includes(s.expense_id)
-    );
+    // フィルタリング済みデータを使用
+    const filteredSplits = expenseSplitsResult.data ?? [];
 
     return (
         <TripDetailClient
@@ -104,7 +108,7 @@ export default async function TripDetailPage({ params }: TripDetailPageProps) {
             members={membersResult.data ?? []}
             itineraryItems={itineraryResult.data ?? []}
             places={placesResult.data ?? []}
-            expenses={expensesResult.data ?? []}
+            expenses={expenses ?? []}
             expenseSplits={filteredSplits}
             currentUserId={user.id}
             isOwner={member.role === "owner"}

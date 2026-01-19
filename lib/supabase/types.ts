@@ -65,23 +65,29 @@ export interface Database {
                 Row: {
                     id: string;
                     trip_id: string;
-                    user_id: string;
+                    user_id: string | null;
                     role: string;
                     joined_at: string;
+                    display_name_override: string | null;
+                    invite_token: string | null;
                 };
                 Insert: {
                     id?: string;
                     trip_id: string;
-                    user_id: string;
+                    user_id?: string | null;
                     role?: string;
                     joined_at?: string;
+                    display_name_override?: string | null;
+                    invite_token?: string | null;
                 };
                 Update: {
                     id?: string;
                     trip_id?: string;
-                    user_id?: string;
+                    user_id?: string | null;
                     role?: string;
                     joined_at?: string;
+                    display_name_override?: string | null;
+                    invite_token?: string | null;
                 };
             };
             itinerary_items: {
@@ -232,6 +238,7 @@ export interface Database {
                     description: string | null;
                     paid_by: string | null;
                     date: string | null;
+                    is_settled: boolean;
                     created_at: string;
                 };
                 Insert: {
@@ -245,6 +252,7 @@ export interface Database {
                     description?: string | null;
                     paid_by?: string | null;
                     date?: string | null;
+                    is_settled?: boolean;
                     created_at?: string;
                 };
                 Update: {
@@ -258,6 +266,7 @@ export interface Database {
                     description?: string | null;
                     paid_by?: string | null;
                     date?: string | null;
+                    is_settled?: boolean;
                     created_at?: string;
                 };
             };

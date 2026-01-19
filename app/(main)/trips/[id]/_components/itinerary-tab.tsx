@@ -11,6 +11,25 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
+import {
+    MoreHorizontal,
+    Clock,
+    MapPin,
+    Notebook,
+    ArrowRight,
+    Plane,
+    Hotel,
+    Utensils,
+    Compass,
+    Map,
+    Tag
+} from "lucide-react";
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import type { Database } from "@/lib/supabase/types";
 
 type ItineraryItem = Database["public"]["Tables"]["itinerary_items"]["Row"];
@@ -19,24 +38,27 @@ interface ItineraryTabProps {
     tripId: string;
     items: ItineraryItem[];
     members: {
-        user_id: string;
+        id: string;
+        user_id: string | null;
+        display_name_override: string | null;
         profiles: { display_name: string } | null;
     }[];
-    currentUserId: string;
+    currentMemberId: string;
     tripStartDate: string | null;
 }
 
 const ITEM_TYPES = {
-    flight: { label: "フライト", emoji: "✈️", category: "transport" },
-    hotel: { label: "ホテル", emoji: "🏨", category: "accommodation" },
-    activity: { label: "アクティビティ", emoji: "🎯", category: "activity" },
-    restaurant: { label: "レストラン", emoji: "🍽️", category: "food" },
-    other: { label: "その他", emoji: "📌", category: "other" },
+    flight: { label: "フライト", emoji: "✈️", category: "transport", icon: Plane },
+    hotel: { label: "ホテル", emoji: "🏨", category: "accommodation", icon: Hotel },
+    activity: { label: "アクティビティ", emoji: "🎯", category: "activity", icon: Compass },
+    restaurant: { label: "レストラン", emoji: "🍽️", category: "food", icon: Utensils },
+    other: { label: "その他", emoji: "📌", category: "other", icon: Tag },
 };
 
-export function ItineraryTab({ tripId, items, members, currentUserId, tripStartDate }: ItineraryTabProps) {
+export function ItineraryTab({ tripId, items, members, currentMemberId, tripStartDate }: ItineraryTabProps) {
     const [dialogOpen, setDialogOpen] = useState(false);
     const [loading, setLoading] = useState(false);
+    const [editItemId, setEditItemId] = useState<string | null>(null);
     const [formData, setFormData] = useState({
         type: "",
         title: "",
@@ -60,11 +82,59 @@ export function ItineraryTab({ tripId, items, members, currentUserId, tripStartD
         nights: "1",
         // Expense options
         autoRegisterExpense: false,
-        paidBy: currentUserId,
-        splitMembers: members.map(m => m.user_id),
+        paidBy: currentMemberId,
+        splitMembers: members.map(m => m.id),
     });
     const router = useRouter();
     const supabase = createClient();
+
+    const handleEdit = (item: ItineraryItem) => {
+        let nights = "1";
+        if (item.type === "hotel" && item.check_in_date && item.check_out_date) {
+            const start = new Date(item.check_in_date);
+            const end = new Date(item.check_out_date);
+            const diff = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
+            nights = diff.toString();
+        }
+
+        setFormData({
+            type: item.type || "",
+            title: item.title || "",
+            date: item.date || "",
+            startTime: item.start_time ? new Date(item.start_time).toLocaleTimeString("ja-JP", { hour: "2-digit", minute: "2-digit", hour12: false }) : "",
+            endTime: item.end_time ? new Date(item.end_time).toLocaleTimeString("ja-JP", { hour: "2-digit", minute: "2-digit", hour12: false }) : "",
+            location: item.location || "",
+            notes: item.notes || "",
+            price: "", // 既存費用の編集は別途
+            airline: item.airline || "",
+            flightNumber: item.flight_number || "",
+            departureAirport: item.departure_airport || "",
+            arrivalAirport: item.arrival_airport || "",
+            departureTime: item.departure_time ? new Date(item.departure_time).toISOString().slice(0, 16) : "",
+            arrivalTime: item.arrival_time ? new Date(item.arrival_time).toISOString().slice(0, 16) : "",
+            confirmationNumber: item.confirmation_number || "",
+            checkInDate: item.check_in_date || "",
+            nights: nights,
+            autoRegisterExpense: false,
+            paidBy: currentMemberId,
+            splitMembers: members.map(m => m.id),
+        });
+        setEditItemId(item.id);
+        setDialogOpen(true);
+    };
+
+    const handleDelete = async (id: string) => {
+        if (!confirm("この旅程を削除してもよろしいですか？")) return;
+        setLoading(true);
+        const { error } = await supabase.from("itinerary_items").delete().eq("id", id);
+        if (error) {
+            toast.error("削除に失敗しました", { description: error.message });
+        } else {
+            toast.success("削除しました");
+            router.refresh();
+        }
+        setLoading(false);
+    };
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -83,8 +153,8 @@ export function ItineraryTab({ tripId, items, members, currentUserId, tripStartD
             type: formData.type,
             title: formData.title,
             date: formData.date || null,
-            start_time: formData.startTime ? `${formData.date}T${formData.startTime}` : null,
-            end_time: formData.endTime ? `${formData.date}T${formData.endTime}` : null,
+            start_time: formData.startTime ? new Date(`${formData.date}T${formData.startTime}`).toISOString() : null,
+            end_time: formData.endTime ? new Date(`${formData.date}T${formData.endTime}`).toISOString() : null,
             location: formData.location || null,
             notes: formData.notes || null,
             created_by: user?.id || null,
@@ -109,13 +179,15 @@ export function ItineraryTab({ tripId, items, members, currentUserId, tripStartD
             }
         }
 
-        const { error } = await supabase.from("itinerary_items").insert(insertData);
+        const { data: savedItem, error } = editItemId
+            ? await supabase.from("itinerary_items").update(insertData).eq("id", editItemId).select().single()
+            : await supabase.from("itinerary_items").insert(insertData).select().single();
 
         if (error) {
-            toast.error("追加に失敗しました", { description: error.message });
+            toast.error(editItemId ? "更新に失敗しました" : "追加に失敗しました", { description: error.message });
         } else {
-            // 金額が入力されており、かつ自動登録がONの場合
-            if (formData.price && Number(formData.price) > 0 && formData.autoRegisterExpense && user) {
+            // 金額が入力されており、かつ自動登録がONかつ新規作成の場合（編集時は複雑になるため一旦新規のみ）
+            if (!editItemId && formData.price && Number(formData.price) > 0 && formData.autoRegisterExpense && user) {
                 const typeInfo = ITEM_TYPES[formData.type as keyof typeof ITEM_TYPES];
                 const { data: expense, error: expenseError } = await supabase
                     .from("expenses")
@@ -144,8 +216,9 @@ export function ItineraryTab({ tripId, items, members, currentUserId, tripStartD
                 }
             }
 
-            toast.success("旅程を追加しました");
+            toast.success(editItemId ? "旅程を更新しました" : "旅程を追加しました");
             setDialogOpen(false);
+            setEditItemId(null);
             setFormData({
                 type: "",
                 title: "",
@@ -165,8 +238,8 @@ export function ItineraryTab({ tripId, items, members, currentUserId, tripStartD
                 checkInDate: "",
                 nights: "1",
                 autoRegisterExpense: false,
-                paidBy: currentUserId,
-                splitMembers: members.map(m => m.user_id),
+                paidBy: currentMemberId,
+                splitMembers: members.map(m => m.id),
             });
             router.refresh();
         }
@@ -184,22 +257,64 @@ export function ItineraryTab({ tripId, items, members, currentUserId, tripStartD
         return acc;
     }, {} as Record<string, ItineraryItem[]>);
 
+    // 各日付内で時間をソート
+    Object.keys(groupedItems).forEach((date) => {
+        groupedItems[date].sort((a, b) => {
+            const timeA = a.type === "flight" ? a.departure_time : (a.start_time || "");
+            const timeB = b.type === "flight" ? b.departure_time : (b.start_time || "");
+            if (!timeA && !timeB) return 0;
+            if (!timeA) return 1;
+            if (!timeB) return -1;
+            return timeA.localeCompare(timeB);
+        });
+    });
+
     const sortedDates = Object.keys(groupedItems).sort();
 
     return (
         <div className="space-y-4">
             <div className="flex justify-end">
-                <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+                <Dialog open={dialogOpen} onOpenChange={(val) => {
+                    setDialogOpen(val);
+                    if (!val) setEditItemId(null);
+                }}>
                     <DialogTrigger asChild>
-                        <Button className="bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700">
+                        <Button
+                            className="bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700"
+                            onClick={() => {
+                                setEditItemId(null);
+                                setFormData({
+                                    type: "",
+                                    title: "",
+                                    date: tripStartDate ?? "",
+                                    startTime: "",
+                                    endTime: "",
+                                    location: "",
+                                    notes: "",
+                                    price: "",
+                                    airline: "",
+                                    flightNumber: "",
+                                    departureAirport: "",
+                                    arrivalAirport: "",
+                                    departureTime: tripStartDate ? `${tripStartDate}T10:00` : "",
+                                    arrivalTime: "",
+                                    confirmationNumber: "",
+                                    checkInDate: tripStartDate ?? "",
+                                    nights: "1",
+                                    autoRegisterExpense: false,
+                                    paidBy: currentMemberId,
+                                    splitMembers: members.map(m => m.id),
+                                });
+                            }}
+                        >
                             + 旅程を追加
                         </Button>
                     </DialogTrigger>
                     <DialogContent className="max-w-md max-h-[80vh] overflow-y-auto">
                         <DialogHeader>
-                            <DialogTitle>旅程を追加</DialogTitle>
+                            <DialogTitle>{editItemId ? "旅程を編集" : "旅程を追加"}</DialogTitle>
                             <DialogDescription>
-                                フライト、ホテル、アクティビティなどを追加
+                                {editItemId ? "旅程の内容を修正します" : "フライト、ホテル、アクティビティなどを追加"}
                             </DialogDescription>
                         </DialogHeader>
                         <form onSubmit={handleSubmit} className="space-y-4">
@@ -430,8 +545,8 @@ export function ItineraryTab({ tripId, items, members, currentUserId, tripStartD
                                                 </SelectTrigger>
                                                 <SelectContent>
                                                     {members.map((member) => (
-                                                        <SelectItem key={member.user_id} value={member.user_id}>
-                                                            {member.profiles?.display_name || "不明なユーザー"}
+                                                        <SelectItem key={member.id} value={member.id}>
+                                                            {member.profiles?.display_name || member.display_name_override || "不明なユーザー"}
                                                         </SelectItem>
                                                     ))}
                                                 </SelectContent>
@@ -442,27 +557,27 @@ export function ItineraryTab({ tripId, items, members, currentUserId, tripStartD
                                             <Label>割り勘対象</Label>
                                             <div className="space-y-2">
                                                 {members.map((member) => (
-                                                    <div key={member.user_id} className="flex items-center space-x-2">
+                                                    <div key={member.id} className="flex items-center space-x-2">
                                                         <input
                                                             type="checkbox"
-                                                            id={`split-${member.user_id}`}
-                                                            checked={formData.splitMembers.includes(member.user_id)}
+                                                            id={`split-${member.id}`}
+                                                            checked={formData.splitMembers.includes(member.id)}
                                                             onChange={(e) => {
                                                                 const checked = e.target.checked;
                                                                 setFormData(prev => ({
                                                                     ...prev,
                                                                     splitMembers: checked
-                                                                        ? [...prev.splitMembers, member.user_id]
-                                                                        : prev.splitMembers.filter(id => id !== member.user_id)
+                                                                        ? [...prev.splitMembers, member.id]
+                                                                        : prev.splitMembers.filter(id => id !== member.id)
                                                                 }));
                                                             }}
                                                             className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                                                         />
                                                         <Label
-                                                            htmlFor={`split-${member.user_id}`}
+                                                            htmlFor={`split-${member.id}`}
                                                             className="cursor-pointer font-normal"
                                                         >
-                                                            {member.profiles?.display_name || "不明なユーザー"}
+                                                            {member.profiles?.display_name || member.display_name_override || "不明なユーザー"}
                                                         </Label>
                                                     </div>
                                                 ))}
@@ -473,7 +588,7 @@ export function ItineraryTab({ tripId, items, members, currentUserId, tripStartD
                             </div>
 
                             <Button type="submit" className="w-full" disabled={loading}>
-                                {loading ? "追加中..." : "追加する"}
+                                {loading ? (editItemId ? "更新中..." : "追加中...") : (editItemId ? "更新する" : "追加する")}
                             </Button>
                         </form>
                     </DialogContent>
@@ -493,63 +608,122 @@ export function ItineraryTab({ tripId, items, members, currentUserId, tripStartD
                     </CardContent>
                 </Card>
             ) : (
-                <div className="space-y-6">
+                <div className="space-y-8 relative before:absolute before:inset-0 before:left-4 before:h-full before:w-0.5 before:bg-muted before:z-0">
                     {sortedDates.map((date) => (
-                        <div key={date}>
-                            <h3 className="text-sm font-semibold text-muted-foreground mb-3 sticky top-0 bg-gray-50 dark:bg-gray-900 py-2">
-                                {date === "未定"
-                                    ? "📅 日付未定"
-                                    : `📅 ${new Date(date).toLocaleDateString("ja-JP", {
-                                        month: "long",
-                                        day: "numeric",
-                                        weekday: "short",
-                                    })}`}
-                            </h3>
-                            <div className="space-y-3">
+                        <div key={date} className="relative z-10">
+                            <div className="flex items-center gap-4 mb-4">
+                                <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center text-white shrink-0 z-20 shadow-md">
+                                    <Clock className="h-4 w-4" />
+                                </div>
+                                <h3 className="text-lg font-bold">
+                                    {date === "未定"
+                                        ? "📅 日付未定"
+                                        : `${new Date(date).toLocaleDateString("ja-JP", {
+                                            month: "long",
+                                            day: "numeric",
+                                            weekday: "short",
+                                        })}`}
+                                </h3>
+                            </div>
+                            <div className="space-y-6 ml-10">
                                 {groupedItems[date].map((item) => {
                                     const typeInfo = ITEM_TYPES[item.type as keyof typeof ITEM_TYPES] || ITEM_TYPES.other;
+                                    const Icon = typeInfo.icon;
+
+                                    const displayTime = item.type === "flight"
+                                        ? (item.departure_time ? new Date(item.departure_time).toLocaleTimeString("ja-JP", { hour: "2-digit", minute: "2-digit" }) : null)
+                                        : (item.start_time ? new Date(item.start_time).toLocaleTimeString("ja-JP", { hour: "2-digit", minute: "2-digit" }) : null);
+
+                                    const displayEndTime = item.type === "flight"
+                                        ? (item.arrival_time ? new Date(item.arrival_time).toLocaleTimeString("ja-JP", { hour: "2-digit", minute: "2-digit" }) : null)
+                                        : (item.end_time ? new Date(item.end_time).toLocaleTimeString("ja-JP", { hour: "2-digit", minute: "2-digit" }) : null);
+
                                     return (
-                                        <Card key={item.id} className="hover:shadow-md transition-shadow">
-                                            <CardContent className="p-4">
-                                                <div className="flex items-start gap-3">
-                                                    <div className="w-10 h-10 rounded-lg bg-blue-50 dark:bg-blue-900/20 flex items-center justify-center text-xl">
-                                                        {typeInfo.emoji}
-                                                    </div>
-                                                    <div className="flex-1 min-w-0">
-                                                        <div className="flex items-center gap-2 mb-1">
-                                                            <h4 className="font-medium truncate">{item.title}</h4>
-                                                            <Badge variant="secondary" className="text-xs shrink-0">
+                                        <Card key={item.id} className="relative transition-all hover:shadow-lg border-l-4 border-l-blue-500 overflow-hidden">
+                                            <CardContent className="p-0">
+                                                <div className="p-4 sm:p-5">
+                                                    <div className="flex items-start justify-between gap-2">
+                                                        <div className="flex-1 min-w-0">
+                                                            {/* Time: Visible and prominent as requested */}
+                                                            {displayTime && (
+                                                                <div className="flex items-center gap-1.5 text-blue-600 font-bold text-sm mb-2 px-2 py-0.5 bg-blue-50 dark:bg-blue-900/30 rounded-full w-fit">
+                                                                    <Clock className="h-3.5 w-3.5" />
+                                                                    <span>{displayTime}</span>
+                                                                    {displayEndTime && (
+                                                                        <>
+                                                                            <ArrowRight className="h-3 w-3 mx-0.5" />
+                                                                            <span>{displayEndTime}</span>
+                                                                        </>
+                                                                    )}
+                                                                </div>
+                                                            )}
+
+                                                            <div className="flex items-center gap-3 mb-2">
+                                                                <div className="w-10 h-10 rounded-xl bg-muted shrink-0 flex items-center justify-center text-2xl">
+                                                                    {typeInfo.emoji}
+                                                                </div>
+                                                                <h4 className="text-xl font-bold truncate leading-tight">{item.title}</h4>
+                                                            </div>
+
+                                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-y-2 mt-4 text-sm">
+                                                                {item.location && (
+                                                                    <div className="flex items-center gap-2 text-muted-foreground mr-4">
+                                                                        <MapPin className="h-4 w-4 shrink-0 text-blue-500" />
+                                                                        <span className="truncate">{item.location}</span>
+                                                                    </div>
+                                                                )}
+
+                                                                {item.type === "flight" && item.flight_number && (
+                                                                    <div className="flex items-center gap-2 text-muted-foreground">
+                                                                        <Plane className="h-4 w-4 shrink-0 text-blue-500" />
+                                                                        <span>{item.airline} {item.flight_number}</span>
+                                                                    </div>
+                                                                )}
+
+                                                                {item.type === "hotel" && item.check_in_date && (
+                                                                    <div className="flex items-center gap-2 text-muted-foreground">
+                                                                        <Hotel className="h-4 w-4 shrink-0 text-blue-500" />
+                                                                        <span>
+                                                                            {new Date(item.check_in_date).toLocaleDateString("ja-JP")} 〜{" "}
+                                                                            {item.check_out_date && new Date(item.check_out_date).toLocaleDateString("ja-JP")}
+                                                                        </span>
+                                                                    </div>
+                                                                )}
+                                                            </div>
+
+                                                            {item.notes && (
+                                                                <div className="mt-4 p-3 rounded-lg bg-orange-50/50 dark:bg-orange-900/10 border border-orange-100 dark:border-orange-900/30 flex gap-2">
+                                                                    <Notebook className="h-4 w-4 shrink-0 text-orange-500 mt-0.5" />
+                                                                    <p className="text-sm text-orange-800 dark:text-orange-200">{item.notes}</p>
+                                                                </div>
+                                                            )}
+                                                        </div>
+
+                                                        {/* Actions: Less noticed but available */}
+                                                        <div className="shrink-0 flex flex-col items-end gap-2">
+                                                            <DropdownMenu>
+                                                                <DropdownMenuTrigger asChild>
+                                                                    <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full">
+                                                                        <MoreHorizontal className="h-4 w-4" />
+                                                                    </Button>
+                                                                </DropdownMenuTrigger>
+                                                                <DropdownMenuContent align="end">
+                                                                    <DropdownMenuItem onClick={() => handleEdit(item)}>
+                                                                        ✏️ 編集
+                                                                    </DropdownMenuItem>
+                                                                    <DropdownMenuItem
+                                                                        className="text-red-600 focus:text-red-600"
+                                                                        onClick={() => handleDelete(item.id)}
+                                                                    >
+                                                                        🗑️ 削除
+                                                                    </DropdownMenuItem>
+                                                                </DropdownMenuContent>
+                                                            </DropdownMenu>
+
+                                                            <Badge variant="secondary" className="text-[10px] uppercase font-bold tracking-wider rounded-lg px-2">
                                                                 {typeInfo.label}
                                                             </Badge>
                                                         </div>
-                                                        {item.type === "flight" && (
-                                                            <p className="text-sm text-muted-foreground">
-                                                                {item.airline} {item.flight_number}
-                                                                {item.departure_airport && item.arrival_airport && (
-                                                                    <span className="ml-2">
-                                                                        {item.departure_airport} → {item.arrival_airport}
-                                                                    </span>
-                                                                )}
-                                                            </p>
-                                                        )}
-                                                        {item.type === "hotel" && item.check_in_date && (
-                                                            <p className="text-sm text-muted-foreground">
-                                                                {new Date(item.check_in_date).toLocaleDateString("ja-JP")} 〜{" "}
-                                                                {item.check_out_date && new Date(item.check_out_date).toLocaleDateString("ja-JP")}
-                                                            </p>
-                                                        )}
-                                                        {item.location && (
-                                                            <p className="text-sm text-muted-foreground">📍 {item.location}</p>
-                                                        )}
-                                                        {item.start_time && (
-                                                            <p className="text-sm text-muted-foreground">
-                                                                🕐 {new Date(item.start_time).toLocaleTimeString("ja-JP", { hour: "2-digit", minute: "2-digit" })}
-                                                                {item.end_time && ` - ${new Date(item.end_time).toLocaleTimeString("ja-JP", { hour: "2-digit", minute: "2-digit" })}`}
-                                                            </p>
-                                                        )}
-                                                        {item.notes && (
-                                                            <p className="text-sm text-muted-foreground mt-1">{item.notes}</p>
-                                                        )}
                                                     </div>
                                                 </div>
                                             </CardContent>

@@ -23,6 +23,13 @@ import {
     SelectValue,
 } from "@/components/ui/select";
 import { toast } from "sonner";
+import { MoreHorizontal } from "lucide-react";
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { SettlementDialog } from "./settlement-dialog";
 
 interface ExpensesTabProps {
@@ -35,21 +42,24 @@ interface ExpensesTabProps {
         description: string | null;
         paid_by: string | null;
         date: string | null;
+        is_settled: boolean;
         created_at: string;
     }[];
     expenseSplits: {
         expense_id: string;
-        user_id: string;
+        user_id: string; // Now refers to trip_members.id
     }[];
     members: {
-        user_id: string;
+        id: string; // trip_members.id
+        user_id: string | null; // profiles.id
         role: string;
+        display_name_override: string | null;
         profiles: {
             id: string;
             display_name: string;
         } | null;
     }[];
-    currentUserId: string;
+    currentMemberId: string;
 }
 
 const CATEGORIES = [
@@ -66,22 +76,55 @@ export function ExpensesTab({
     expenses,
     expenseSplits,
     members,
-    currentUserId,
+    currentMemberId,
 }: ExpensesTabProps) {
     const [open, setOpen] = useState(false);
     const [loading, setLoading] = useState(false);
+    const [editExpenseId, setEditExpenseId] = useState<string | null>(null);
     const [formData, setFormData] = useState({
         amount: "",
         category: "food",
         description: "",
-        paidBy: currentUserId,
+        paidBy: currentMemberId,
         date: new Date().toISOString().split("T")[0],
     });
     const [selectedMembers, setSelectedMembers] = useState<string[]>(
-        members.map((m) => m.user_id)
+        members.map((m) => m.id)
     );
+    const [showSettled, setShowSettled] = useState(true);
     const router = useRouter();
     const supabase = createClient();
+
+    const handleEdit = (expense: any) => {
+        const splits = expenseSplits
+            .filter((s) => s.expense_id === expense.id)
+            .map((s) => s.user_id);
+
+        setFormData({
+            amount: expense.amount.toString(),
+            category: expense.category || "food",
+            description: expense.description || "",
+            paidBy: expense.paid_by || "",
+            date: expense.date || new Date().toISOString().split("T")[0],
+        });
+        setSelectedMembers(splits);
+        setEditExpenseId(expense.id);
+        setOpen(true);
+    };
+
+    const handleDelete = async (id: string) => {
+        if (!confirm("この支払いを削除してもよろしいですか？")) return;
+        setLoading(true);
+        // Cascading delete is preferred, but let's be explicit if needed
+        const { error } = await supabase.from("expenses").delete().eq("id", id);
+        if (error) {
+            toast.error("削除に失敗しました", { description: error.message });
+        } else {
+            toast.success("削除しました");
+            router.refresh();
+        }
+        setLoading(false);
+    };
 
     const handleSubmit = async () => {
         if (!formData.amount || Number(formData.amount) <= 0) {
@@ -95,89 +138,126 @@ export function ExpensesTab({
 
         setLoading(true);
 
-        // 支払い登録
-        const { data: expense, error } = await supabase
-            .from("expenses")
-            .insert({
-                trip_id: tripId,
-                amount: Number(formData.amount),
-                currency: "JPY",
-                amount_jpy: Number(formData.amount),
-                category: formData.category,
-                description: formData.description || null,
-                paid_by: formData.paidBy,
-                date: formData.date || null,
-            })
-            .select()
-            .single();
+        const expenseData = {
+            trip_id: tripId,
+            amount: Number(formData.amount),
+            currency: "JPY",
+            amount_jpy: Number(formData.amount),
+            category: formData.category,
+            description: formData.description || null,
+            paid_by: formData.paidBy,
+            date: formData.date || null,
+        };
+
+        const { data: expense, error } = editExpenseId
+            ? await supabase.from("expenses").update(expenseData).eq("id", editExpenseId).select().single()
+            : await supabase.from("expenses").insert(expenseData).select().single();
 
         if (error) {
-            toast.error("登録に失敗しました", { description: error.message });
+            toast.error(editExpenseId ? "更新に失敗しました" : "登録に失敗しました", { description: error.message });
             setLoading(false);
             return;
         }
 
+        if (editExpenseId) {
+            // 既存の分割を削除
+            await supabase.from("expense_splits").delete().eq("expense_id", editExpenseId);
+        }
+
         // 対象者を登録
-        const splits = selectedMembers.map((userId) => ({
+        const splits = selectedMembers.map((memberId) => ({
             expense_id: expense.id,
-            user_id: userId,
+            user_id: memberId,
         }));
 
-        const { error: splitError } = await supabase
-            .from("expense_splits")
-            .insert(splits);
+        const { error: splitError } = await supabase.from("expense_splits").insert(splits);
 
         if (splitError) {
             console.error("Split error:", splitError);
         }
 
-        toast.success("支払いを登録しました");
+        toast.success(editExpenseId ? "支払いを更新しました" : "支払いを登録しました");
         setOpen(false);
+        setEditExpenseId(null);
         setFormData({
             amount: "",
             category: "food",
             description: "",
-            paidBy: currentUserId,
+            paidBy: currentMemberId,
             date: new Date().toISOString().split("T")[0],
         });
-        setSelectedMembers(members.map((m) => m.user_id));
+        setSelectedMembers(members.map((m) => m.id));
         router.refresh();
         setLoading(false);
     };
 
-    const toggleMember = (userId: string) => {
+    const toggleMember = (memberId: string) => {
         setSelectedMembers((prev) =>
-            prev.includes(userId)
-                ? prev.filter((id) => id !== userId)
-                : [...prev, userId]
+            prev.includes(memberId)
+                ? prev.filter((id) => id !== memberId)
+                : [...prev, memberId]
         );
     };
 
-    const getMemberName = (userId: string | null) => {
-        if (!userId) return "不明";
-        const member = members.find((m) => m.user_id === userId);
-        return member?.profiles?.display_name ?? "不明";
+    const getMemberName = (memberId: string | null) => {
+        if (!memberId) return "不明";
+        const member = members.find((m) => m.id === memberId);
+        return member?.profiles?.display_name || member?.display_name_override || "不明";
     };
 
     const getCategoryInfo = (category: string | null) => {
         return CATEGORIES.find((c) => c.value === category) ?? CATEGORIES[5];
     };
 
-    // 合計金額
-    const totalAmount = expenses.reduce((sum, e) => sum + e.amount, 0);
+    const toggleSettled = async (id: string, currentStatus: boolean) => {
+        const { error } = await supabase
+            .from("expenses")
+            .update({ is_settled: !currentStatus })
+            .eq("id", id);
 
-    // 精算用データを準備
-    const expenseData = expenses.map((e) => ({
-        amount: e.amount,
-        paid_by: e.paid_by ?? "",
-        splits: expenseSplits
-            .filter((s) => s.expense_id === e.id)
-            .map((s) => s.user_id),
-    }));
+        if (error) {
+            toast.error("更新に失敗しました");
+        } else {
+            router.refresh();
+        }
+    };
+
+    const handleSettleAll = async () => {
+        const unSettledIds = expenses.filter(e => !e.is_settled).map(e => e.id);
+        if (unSettledIds.length === 0) return;
+
+        const { error } = await supabase
+            .from("expenses")
+            .update({ is_settled: true })
+            .in("id", unSettledIds);
+
+        if (error) {
+            toast.error("精算処理に失敗しました");
+        } else {
+            toast.success("全ての費用を精算済みにしました");
+            router.refresh();
+        }
+    };
+
+    // 未精算の合計金額
+    const totalUnsettledAmount = expenses
+        .filter(e => !e.is_settled)
+        .reduce((sum, e) => sum + e.amount, 0);
+
+    // 精算用データを準備（未精算のみ）
+    const unsettledExpenseData = expenses
+        .filter(e => !e.is_settled)
+        .map((e) => ({
+            amount: e.amount,
+            paid_by: e.paid_by ?? "",
+            splits: expenseSplits
+                .filter((s) => s.expense_id === e.id)
+                .map((s) => s.user_id),
+        }));
 
     const memberData = members.map((m) => ({
-        userId: m.user_id,
-        displayName: m.profiles?.display_name ?? "不明",
+        userId: m.id, // Now trip_members.id
+        displayName: m.profiles?.display_name || m.display_name_override || "不明",
     }));
 
     return (
@@ -187,22 +267,54 @@ export function ExpensesTab({
                 <div>
                     <h3 className="font-semibold">費用管理</h3>
                     <p className="text-sm text-muted-foreground">
-                        合計: ¥{totalAmount.toLocaleString()}
+                        未精算合計: ¥{totalUnsettledAmount.toLocaleString()}
                     </p>
                 </div>
                 <div className="flex gap-2">
                     <SettlementDialog
                         tripName="旅行"
-                        expenses={expenseData}
+                        expenses={unsettledExpenseData}
                         members={memberData}
+                        onSettleAll={handleSettleAll}
                     />
-                    <Dialog open={open} onOpenChange={setOpen}>
+                    <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setShowSettled(!showSettled)}
+                        className="text-xs text-muted-foreground"
+                    >
+                        {showSettled ? "📑 精算済を隠す" : "📑 精算済を出す"}
+                    </Button>
+                    <Dialog open={open} onOpenChange={(val) => {
+                        setOpen(val);
+                        if (!val) {
+                            setEditExpenseId(null);
+                            setFormData({
+                                amount: "",
+                                category: "food",
+                                description: "",
+                                paidBy: currentMemberId,
+                                date: new Date().toISOString().split("T")[0],
+                            });
+                            setSelectedMembers(members.map((m) => m.id));
+                        }
+                    }}>
                         <DialogTrigger asChild>
-                            <Button size="sm">+ 支払い追加</Button>
+                            <Button size="sm" onClick={() => {
+                                setEditExpenseId(null);
+                                setFormData({
+                                    amount: "",
+                                    category: "food",
+                                    description: "",
+                                    paidBy: currentMemberId,
+                                    date: new Date().toISOString().split("T")[0],
+                                });
+                                setSelectedMembers(members.map((m) => m.id));
+                            }}>+ 支払い追加</Button>
                         </DialogTrigger>
                         <DialogContent>
                             <DialogHeader>
-                                <DialogTitle>支払いを登録</DialogTitle>
+                                <DialogTitle>{editExpenseId ? "支払いを編集" : "支払いを登録"}</DialogTitle>
                             </DialogHeader>
                             <div className="space-y-4 pt-4">
                                 <div className="space-y-2">
@@ -273,8 +385,8 @@ export function ExpensesTab({
                                         </SelectTrigger>
                                         <SelectContent>
                                             {members.map((m) => (
-                                                <SelectItem key={m.user_id} value={m.user_id}>
-                                                    {m.profiles?.display_name ?? "不明"}
+                                                <SelectItem key={m.id} value={m.id}>
+                                                    {m.profiles?.display_name || m.display_name_override || "不明"}
                                                 </SelectItem>
                                             ))}
                                         </SelectContent>
@@ -286,16 +398,16 @@ export function ExpensesTab({
                                     <div className="flex flex-wrap gap-2">
                                         {members.map((m) => (
                                             <Badge
-                                                key={m.user_id}
+                                                key={m.id}
                                                 variant={
-                                                    selectedMembers.includes(m.user_id)
+                                                    selectedMembers.includes(m.id)
                                                         ? "default"
                                                         : "outline"
                                                 }
                                                 className="cursor-pointer"
-                                                onClick={() => toggleMember(m.user_id)}
+                                                onClick={() => toggleMember(m.id)}
                                             >
-                                                {m.profiles?.display_name ?? "不明"}
+                                                {m.profiles?.display_name || m.display_name_override || "不明"}
                                             </Badge>
                                         ))}
                                     </div>
@@ -306,7 +418,7 @@ export function ExpensesTab({
                                     className="w-full"
                                     disabled={loading}
                                 >
-                                    {loading ? "登録中..." : "登録"}
+                                    {loading ? (editExpenseId ? "更新中..." : "登録中...") : (editExpenseId ? "更新する" : "登録する")}
                                 </Button>
                             </div>
                         </DialogContent>
@@ -315,50 +427,86 @@ export function ExpensesTab({
             </div>
 
             {/* 支払い一覧 */}
-            {expenses.length === 0 ? (
+            {expenses.filter(e => showSettled || !e.is_settled).length === 0 ? (
                 <Card className="border-dashed">
-                    <CardContent className="py-8 text-center">
-                        <p className="text-muted-foreground">支払いがありません</p>
+                    <CardContent className="py-8 text-center text-muted-foreground">
+                        {expenses.length === 0 ? "支払いがありません" : "表示できる支払いがありません"}
                     </CardContent>
                 </Card>
             ) : (
                 <div className="space-y-2">
-                    {expenses.map((expense) => {
-                        const cat = getCategoryInfo(expense.category);
-                        const splits = expenseSplits.filter(
-                            (s) => s.expense_id === expense.id
-                        );
-                        return (
-                            <Card key={expense.id}>
-                                <CardContent className="py-3">
-                                    <div className="flex items-center justify-between">
-                                        <div className="flex items-center gap-3">
-                                            <span className="text-2xl">{cat.icon}</span>
-                                            <div>
-                                                <p className="font-medium">
-                                                    {expense.description || cat.label}
-                                                </p>
-                                                <p className="text-sm text-muted-foreground">
-                                                    {getMemberName(expense.paid_by)}が支払い →{" "}
-                                                    {splits.length}人で割り勘
-                                                </p>
+                    {expenses
+                        .filter(e => showSettled || !e.is_settled)
+                        .map((expense) => {
+                            const cat = getCategoryInfo(expense.category);
+                            const splits = expenseSplits.filter(
+                                (s) => s.expense_id === expense.id
+                            );
+                            return (
+                                <Card key={expense.id}>
+                                    <CardContent className="py-3">
+                                        <div className="flex items-center justify-between">
+                                            <div className="flex items-center gap-3">
+                                                <div className="flex items-center gap-2">
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={expense.is_settled}
+                                                        onChange={() => toggleSettled(expense.id, expense.is_settled)}
+                                                        className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                                        title={expense.is_settled ? "未精算に戻す" : "精算済みにする"}
+                                                    />
+                                                    <span className="text-2xl">{cat.icon}</span>
+                                                </div>
+                                                <div className={expense.is_settled ? "opacity-60" : ""}>
+                                                    <div className="flex items-center gap-2">
+                                                        <p className="font-medium">
+                                                            {expense.description || cat.label}
+                                                        </p>
+                                                        {expense.is_settled && (
+                                                            <Badge variant="secondary" className="text-[10px] py-0 h-4 bg-gray-100 text-gray-500">精算済</Badge>
+                                                        )}
+                                                    </div>
+                                                    <p className="text-sm text-muted-foreground">
+                                                        {getMemberName(expense.paid_by)}が支払い →{" "}
+                                                        {splits.length}人で割り勘
+                                                    </p>
+                                                </div>
+                                            </div>
+                                            <div className="flex flex-col items-end gap-2">
+                                                <div className="flex items-center gap-2">
+                                                    <p className="font-bold">
+                                                        ¥{expense.amount.toLocaleString()}
+                                                    </p>
+                                                    <DropdownMenu>
+                                                        <DropdownMenuTrigger asChild>
+                                                            <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full">
+                                                                <MoreHorizontal className="h-4 w-4" />
+                                                            </Button>
+                                                        </DropdownMenuTrigger>
+                                                        <DropdownMenuContent align="end">
+                                                            <DropdownMenuItem onClick={() => handleEdit(expense)}>
+                                                                ✏️ 編集
+                                                            </DropdownMenuItem>
+                                                            <DropdownMenuItem
+                                                                className="text-red-600 focus:text-red-600"
+                                                                onClick={() => handleDelete(expense.id)}
+                                                            >
+                                                                🗑️ 削除
+                                                            </DropdownMenuItem>
+                                                        </DropdownMenuContent>
+                                                    </DropdownMenu>
+                                                </div>
+                                                {expense.date && (
+                                                    <p className="text-xs text-muted-foreground mt-1">
+                                                        {new Date(expense.date).toLocaleDateString("ja-JP")}
+                                                    </p>
+                                                )}
                                             </div>
                                         </div>
-                                        <div className="text-right">
-                                            <p className="font-bold">
-                                                ¥{expense.amount.toLocaleString()}
-                                            </p>
-                                            {expense.date && (
-                                                <p className="text-xs text-muted-foreground">
-                                                    {new Date(expense.date).toLocaleDateString("ja-JP")}
-                                                </p>
-                                            )}
-                                        </div>
-                                    </div>
-                                </CardContent>
-                            </Card>
-                        );
-                    })}
+                                    </CardContent>
+                                </Card>
+                            );
+                        })}
                 </div>
             )}
         </div>

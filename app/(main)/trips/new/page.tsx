@@ -9,6 +9,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "sonner";
+import type { Database } from "@/lib/supabase/types";
+
+type TripMemberInsert = Database["public"]["Tables"]["trip_members"]["Insert"];
 
 function generateInviteCode(): string {
     // crypto.randomUUID() を使用して安全なランダム文字列を生成
@@ -22,9 +25,23 @@ export default function NewTripPage() {
     const [startDate, setStartDate] = useState("");
     const [endDate, setEndDate] = useState("");
     const [destinations, setDestinations] = useState("");
+    const [manualMembers, setManualMembers] = useState<string[]>([]); // 名前文字列の配列に変更
+    const [currentName, setCurrentName] = useState(""); // 入力中の名前
     const [loading, setLoading] = useState(false);
     const router = useRouter();
     const supabase = createClient();
+
+    const addMember = () => {
+        const trimmedName = currentName.trim();
+        if (trimmedName && !manualMembers.includes(trimmedName)) {
+            setManualMembers([...manualMembers, trimmedName]);
+            setCurrentName("");
+        }
+    };
+
+    const removeMember = (index: number) => {
+        setManualMembers(manualMembers.filter((_, i) => i !== index));
+    };
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -33,6 +50,7 @@ export default function NewTripPage() {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) {
             toast.error("ログインしてください");
+            setLoading(false);
             return;
         }
 
@@ -61,17 +79,33 @@ export default function NewTripPage() {
             return;
         }
 
-        // メンバーとして自分を追加（オーナー）
-        const { error: memberError } = await supabase
-            .from("trip_members")
-            .insert({
+        // メンバー登録用の配列を作成
+        const membersToInsert: TripMemberInsert[] = [
+            // オーナー（自分）
+            {
                 trip_id: trip.id,
                 user_id: user.id,
                 role: "owner",
+            },
+        ];
+
+        // 手動追加メンバー
+        manualMembers.forEach((name) => {
+            membersToInsert.push({
+                trip_id: trip.id,
+                user_id: null,
+                role: "member",
+                display_name_override: name,
             });
+        });
+
+        const { error: memberError } = await supabase
+            .from("trip_members")
+            .insert(membersToInsert);
 
         if (memberError) {
             console.error("Member creation error:", memberError);
+            toast.error("一部メンバーの登録に失敗しました");
         }
 
         toast.success("旅行を作成しました！");
@@ -95,7 +129,7 @@ export default function NewTripPage() {
 
             {/* フォーム */}
             <main className="max-w-2xl mx-auto px-4 py-6">
-                <Card>
+                <Card className="shadow-lg border-0 bg-white/90 dark:bg-gray-900/90 backdrop-blur-sm">
                     <CardHeader>
                         <CardTitle>旅行情報</CardTitle>
                         <CardDescription>
@@ -112,6 +146,7 @@ export default function NewTripPage() {
                                     value={name}
                                     onChange={(e) => setName(e.target.value)}
                                     required
+                                    className="h-11"
                                 />
                             </div>
 
@@ -122,6 +157,7 @@ export default function NewTripPage() {
                                     placeholder="例: 大学の友達と3泊4日"
                                     value={description}
                                     onChange={(e) => setDescription(e.target.value)}
+                                    className="h-11"
                                 />
                             </div>
 
@@ -133,6 +169,7 @@ export default function NewTripPage() {
                                         type="date"
                                         value={startDate}
                                         onChange={(e) => setStartDate(e.target.value)}
+                                        className="h-11"
                                     />
                                 </div>
                                 <div className="space-y-2">
@@ -142,6 +179,7 @@ export default function NewTripPage() {
                                         type="date"
                                         value={endDate}
                                         onChange={(e) => setEndDate(e.target.value)}
+                                        className="h-11"
                                     />
                                 </div>
                             </div>
@@ -153,15 +191,65 @@ export default function NewTripPage() {
                                     placeholder="例: 沖縄, 那覇, 石垣島"
                                     value={destinations}
                                     onChange={(e) => setDestinations(e.target.value)}
+                                    className="h-11"
                                 />
+                            </div>
+
+                            <div className="space-y-4 border-t pt-4">
+                                <Label>メンバーを追加（任意）</Label>
+                                <div className="flex gap-2">
+                                    <Input
+                                        placeholder="例: 田中太郎"
+                                        value={currentName}
+                                        onChange={(e) => setCurrentName(e.target.value)}
+                                        onKeyDown={(e) => {
+                                            if (e.key === "Enter") {
+                                                e.preventDefault();
+                                                addMember();
+                                            }
+                                        }}
+                                        className="h-11"
+                                    />
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        onClick={addMember}
+                                        className="h-11 px-4 border-blue-200 text-blue-600 hover:bg-blue-50"
+                                    >
+                                        追加
+                                    </Button>
+                                </div>
+
+                                {manualMembers.length > 0 && (
+                                    <div className="flex flex-wrap gap-2 pt-2">
+                                        {manualMembers.map((mName, index) => (
+                                            <div
+                                                key={index}
+                                                className="flex items-center gap-1 bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 px-3 py-1.5 rounded-full text-sm border border-blue-100 dark:border-blue-800"
+                                            >
+                                                <span>{mName}</span>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => removeMember(index)}
+                                                    className="hover:text-red-500 transition-colors"
+                                                >
+                                                    ✕
+                                                </button>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                                <p className="text-[12px] text-muted-foreground">
+                                    一緒に行く友達の名前を入力して追加してください。アカウントがなくても費用計算に含められます。
+                                </p>
                             </div>
 
                             <Button
                                 type="submit"
-                                className="w-full bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700"
+                                className="w-full h-12 text-base bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 shadow-md font-bold"
                                 disabled={loading}
                             >
-                                {loading ? "作成中..." : "旅行を作成"}
+                                {loading ? "作成中..." : "旅行をスタート！"}
                             </Button>
                         </form>
                     </CardContent>

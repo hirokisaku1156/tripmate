@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -41,6 +41,19 @@ export function TripDetailClient({
     isOwner,
 }: TripDetailClientProps) {
     const [activeTab, setActiveTab] = useState("itinerary");
+    const [mounted, setMounted] = useState(false);
+
+    useEffect(() => {
+        setMounted(true);
+    }, []);
+
+    // 現在のユーザーのメンバーレコードIDを特定
+    const currentMemberId = members.find(m => m.user_id === currentUserId)?.id || "";
+
+    if (!mounted) {
+        return <div className="min-h-screen bg-white dark:bg-gray-950" />;
+    }
+
 
     return (
         <div className="min-h-screen pb-20">
@@ -123,8 +136,13 @@ export function TripDetailClient({
                         <ItineraryTab
                             tripId={trip.id}
                             items={itineraryItems}
-                            members={members}
-                            currentUserId={currentUserId}
+                            members={members.map(m => ({
+                                id: m.id,
+                                user_id: m.user_id,
+                                profiles: m.profiles,
+                                display_name_override: m.display_name_override
+                            }))}
+                            currentMemberId={currentMemberId}
                             tripStartDate={trip.start_date}
                         />
                     </TabsContent>
@@ -147,8 +165,14 @@ export function TripDetailClient({
                             tripId={trip.id}
                             expenses={expenses}
                             expenseSplits={expenseSplits}
-                            members={members}
-                            currentUserId={currentUserId}
+                            members={members.map(m => ({
+                                id: m.id,
+                                user_id: m.user_id,
+                                role: m.role,
+                                display_name_override: m.display_name_override,
+                                profiles: m.profiles
+                            }))}
+                            currentMemberId={currentMemberId}
                         />
                     </TabsContent>
                 </Tabs>

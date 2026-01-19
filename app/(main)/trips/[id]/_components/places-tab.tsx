@@ -11,6 +11,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
+import { MoreHorizontal } from "lucide-react";
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import type { Database } from "@/lib/supabase/types";
 
 type Place = Database["public"]["Tables"]["places"]["Row"];
@@ -31,6 +38,7 @@ export function PlacesTab({ tripId, places }: PlacesTabProps) {
     const [dialogOpen, setDialogOpen] = useState(false);
     const [filter, setFilter] = useState<"all" | "tentative" | "confirmed">("all");
     const [loading, setLoading] = useState(false);
+    const [editPlaceId, setEditPlaceId] = useState<string | null>(null);
     const [formData, setFormData] = useState({
         name: "",
         address: "",
@@ -40,13 +48,37 @@ export function PlacesTab({ tripId, places }: PlacesTabProps) {
     const router = useRouter();
     const supabase = createClient();
 
+    const handleEdit = (place: Place) => {
+        setFormData({
+            name: place.name || "",
+            address: place.address || "",
+            category: (place.category as any) || "sightseeing",
+            notes: place.notes || "",
+        });
+        setEditPlaceId(place.id);
+        setDialogOpen(true);
+    };
+
+    const handleDelete = async (id: string) => {
+        if (!confirm("この場所を削除してもよろしいですか？")) return;
+        setLoading(true);
+        const { error } = await supabase.from("places").delete().eq("id", id);
+        if (error) {
+            toast.error("削除に失敗しました", { description: error.message });
+        } else {
+            toast.success("削除しました");
+            router.refresh();
+        }
+        setLoading(false);
+    };
+
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setLoading(true);
 
         const { data: { user } } = await supabase.auth.getUser();
 
-        const { error } = await supabase.from("places").insert({
+        const placeData = {
             trip_id: tripId,
             name: formData.name,
             address: formData.address || null,
@@ -54,13 +86,18 @@ export function PlacesTab({ tripId, places }: PlacesTabProps) {
             notes: formData.notes || null,
             status: "tentative",
             created_by: user?.id || null,
-        });
+        };
+
+        const { error } = editPlaceId
+            ? await supabase.from("places").update(placeData).eq("id", editPlaceId)
+            : await supabase.from("places").insert(placeData);
 
         if (error) {
-            toast.error("追加に失敗しました", { description: error.message });
+            toast.error(editPlaceId ? "更新に失敗しました" : "追加に失敗しました", { description: error.message });
         } else {
-            toast.success("場所を追加しました");
+            toast.success(editPlaceId ? "場所を更新しました" : "場所を追加しました");
             setDialogOpen(false);
+            setEditPlaceId(null);
             setFormData({ name: "", address: "", category: "sightseeing", notes: "" });
             router.refresh();
         }
@@ -132,17 +169,29 @@ export function PlacesTab({ tripId, places }: PlacesTabProps) {
                         確定
                     </Button>
                 </div>
-                <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+                <Dialog open={dialogOpen} onOpenChange={(val) => {
+                    setDialogOpen(val);
+                    if (!val) {
+                        setEditPlaceId(null);
+                        setFormData({ name: "", address: "", category: "sightseeing", notes: "" });
+                    }
+                }}>
                     <DialogTrigger asChild>
-                        <Button className="bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700">
+                        <Button
+                            className="bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700"
+                            onClick={() => {
+                                setEditPlaceId(null);
+                                setFormData({ name: "", address: "", category: "sightseeing", notes: "" });
+                            }}
+                        >
                             + 追加
                         </Button>
                     </DialogTrigger>
                     <DialogContent className="max-w-md">
                         <DialogHeader>
-                            <DialogTitle>行きたい場所を追加</DialogTitle>
+                            <DialogTitle>{editPlaceId ? "行きたい場所を編集" : "行きたい場所を追加"}</DialogTitle>
                             <DialogDescription>
-                                気になるスポットを登録しておきましょう
+                                {editPlaceId ? "場所の情報を修正します" : "気になるスポットを登録しておきましょう"}
                             </DialogDescription>
                         </DialogHeader>
                         <form onSubmit={handleSubmit} className="space-y-4">
@@ -190,7 +239,7 @@ export function PlacesTab({ tripId, places }: PlacesTabProps) {
                                 />
                             </div>
                             <Button type="submit" className="w-full" disabled={loading}>
-                                {loading ? "追加中..." : "追加する"}
+                                {loading ? (editPlaceId ? "更新中..." : "追加中...") : (editPlaceId ? "更新する" : "追加する")}
                             </Button>
                         </form>
                     </DialogContent>
@@ -223,14 +272,34 @@ export function PlacesTab({ tripId, places }: PlacesTabProps) {
                                             {categoryInfo.emoji}
                                         </div>
                                         <div className="flex-1 min-w-0">
-                                            <div className="flex items-center gap-2 mb-1">
-                                                <h4 className="font-medium truncate">{place.name}</h4>
-                                                <Badge
-                                                    variant={place.status === "confirmed" ? "default" : "secondary"}
-                                                    className="text-xs shrink-0"
-                                                >
-                                                    {place.status === "confirmed" ? "確定" : "未確定"}
-                                                </Badge>
+                                            <div className="flex items-center justify-between gap-2 mb-1">
+                                                <div className="flex items-center gap-2 min-w-0">
+                                                    <h4 className="font-medium truncate">{place.name}</h4>
+                                                    <Badge
+                                                        variant={place.status === "confirmed" ? "default" : "secondary"}
+                                                        className="text-xs shrink-0"
+                                                    >
+                                                        {place.status === "confirmed" ? "確定" : "未確定"}
+                                                    </Badge>
+                                                </div>
+                                                <DropdownMenu>
+                                                    <DropdownMenuTrigger asChild>
+                                                        <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full">
+                                                            <MoreHorizontal className="h-4 w-4" />
+                                                        </Button>
+                                                    </DropdownMenuTrigger>
+                                                    <DropdownMenuContent align="end">
+                                                        <DropdownMenuItem onClick={() => handleEdit(place)}>
+                                                            ✏️ 編集
+                                                        </DropdownMenuItem>
+                                                        <DropdownMenuItem
+                                                            className="text-red-600 focus:text-red-600"
+                                                            onClick={() => handleDelete(place.id)}
+                                                        >
+                                                            🗑️ 削除
+                                                        </DropdownMenuItem>
+                                                    </DropdownMenuContent>
+                                                </DropdownMenu>
                                             </div>
                                             {place.address && (
                                                 <p className="text-sm text-muted-foreground mb-1">📍 {place.address}</p>

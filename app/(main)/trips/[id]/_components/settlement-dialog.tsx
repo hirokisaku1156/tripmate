@@ -28,18 +28,27 @@ interface SettlementDialogProps {
         userId: string;
         displayName: string;
     }[];
+    onSettleAll?: () => void;
 }
 
 export function SettlementDialog({
     tripName,
     expenses,
     members,
+    onSettleAll,
 }: SettlementDialogProps) {
     const [open, setOpen] = useState(false);
 
     const balances = calculateBalances(expenses, members);
     const settlements = calculateSettlements(balances);
     const totalAmount = expenses.reduce((sum, e) => sum + e.amount, 0);
+
+    const handleSettleAll = () => {
+        if (onSettleAll) {
+            onSettleAll();
+            setOpen(false);
+        }
+    };
 
     const handleCopy = () => {
         const text = generateSettlementText(tripName, settlements, totalAmount);
@@ -126,6 +135,18 @@ export function SettlementDialog({
                             ))
                         )}
                     </div>
+
+                    {/* 精算実行ボタン */}
+                    {settlements.length > 0 && onSettleAll && (
+                        <div className="pt-2">
+                            <Button className="w-full bg-blue-600 hover:bg-blue-700" onClick={handleSettleAll}>
+                                ✅ 全て精算済みにする
+                            </Button>
+                            <p className="text-[10px] text-center text-muted-foreground mt-2">
+                                ※対象の支払いが全て「精算済み」としてマークされます
+                            </p>
+                        </div>
+                    )}
 
                     {/* 共有ボタン */}
                     <div className="flex gap-2">

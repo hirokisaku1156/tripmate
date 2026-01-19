@@ -38,23 +38,26 @@ export function calculateBalances(
         const splitCount = expense.splits.length;
         if (splitCount === 0) return;
 
-        const perPerson = expense.amount / splitCount;
+        const perPerson = Math.floor(expense.amount / splitCount);
+        const remainder = expense.amount - (perPerson * splitCount);
 
         // 払った人はプラス（受け取るべき）
         const payerBalance = balanceMap.get(expense.paid_by) ?? 0;
         balanceMap.set(expense.paid_by, payerBalance + expense.amount);
 
         // 対象者はマイナス（払うべき）
-        expense.splits.forEach(userId => {
+        expense.splits.forEach((userId, index) => {
             const balance = balanceMap.get(userId) ?? 0;
-            balanceMap.set(userId, balance - perPerson);
+            // 最後の1人に端数を寄せる
+            const amountToSubtract = index === splitCount - 1 ? perPerson + remainder : perPerson;
+            balanceMap.set(userId, balance - amountToSubtract);
         });
     });
 
     return members.map(m => ({
         userId: m.userId,
         displayName: m.displayName,
-        balance: Math.round(balanceMap.get(m.userId) ?? 0),
+        balance: balanceMap.get(m.userId) ?? 0,
     }));
 }
 
