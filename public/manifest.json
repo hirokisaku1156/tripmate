@@ -2,8 +2,15 @@
   "name": "TripMate",
   "short_name": "TripMate",
   "description": "友達との旅行をもっと楽しく",
-  "start_url": "/trips",
+  "id": "/",
+  "start_url": "/",
+  "scope": "/",
   "display": "standalone",
+  "display_override": [
+    "standalone",
+    "fullscreen",
+    "minimal-ui"
+  ],
   "orientation": "portrait",
   "background_color": "#ffffff",
   "theme_color": "#3B82F6",

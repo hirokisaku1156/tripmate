@@ -19,8 +19,11 @@ export const metadata: Metadata = {
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
-    statusBarStyle: "default",
+    statusBarStyle: "black-translucent",
     title: "TripMate",
+    startupImage: [
+      "/icons/icon-512.png",
+    ],
   },
 };
 
