@@ -23,6 +23,7 @@ interface ItineraryTabProps {
         profiles: { display_name: string } | null;
     }[];
     currentUserId: string;
+    tripStartDate: string | null;
 }
 
 const ITEM_TYPES = {
@@ -33,13 +34,13 @@ const ITEM_TYPES = {
     other: { label: "その他", emoji: "📌", category: "other" },
 };
 
-export function ItineraryTab({ tripId, items, members, currentUserId }: ItineraryTabProps) {
+export function ItineraryTab({ tripId, items, members, currentUserId, tripStartDate }: ItineraryTabProps) {
     const [dialogOpen, setDialogOpen] = useState(false);
     const [loading, setLoading] = useState(false);
     const [formData, setFormData] = useState({
         type: "activity",
         title: "",
-        date: "",
+        date: tripStartDate ?? "",
         startTime: "",
         endTime: "",
         location: "",

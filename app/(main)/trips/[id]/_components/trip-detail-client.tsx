@@ -92,7 +92,7 @@ export function TripDetailClient({
             {/* タブナビゲーション */}
             <main className="max-w-2xl mx-auto">
                 <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-                    <TabsList className="w-full justify-start rounded-none border-b bg-transparent p-0 h-auto">
+                    <TabsList className="w-full justify-start rounded-none border-b bg-transparent p-0 h-auto overflow-x-auto">
                         <TabsTrigger
                             value="itinerary"
                             className="rounded-none border-b-2 border-transparent data-[state=active]:border-blue-500 data-[state=active]:bg-transparent px-4 py-3"
@@ -125,6 +125,7 @@ export function TripDetailClient({
                             items={itineraryItems}
                             members={members}
                             currentUserId={currentUserId}
+                            tripStartDate={trip.start_date}
                         />
                     </TabsContent>
 
