@@ -455,444 +455,447 @@ export function ItineraryTab({ tripId, items, members, currentMemberId, tripStar
     Object.keys(groupedItems).forEach(d => datesWithHotels.add(d));
     const sortedDates = Array.from(datesWithHotels).sort();
 
+    const addButton = (
+        <Dialog open={dialogOpen} onOpenChange={(val) => {
+            setDialogOpen(val);
+            if (!val) setEditItemId(null);
+        }}>
+            <DialogTrigger asChild>
+                <Button
+                    className="bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 h-8 px-3 text-[12px] font-bold shadow-sm"
+                    onClick={() => {
+                        setEditItemId(null);
+                        setFormData({
+                            type: "",
+                            title: "",
+                            date: tripStartDate ?? "",
+                            startTime: "",
+                            endTime: "",
+                            location: "",
+                            notes: "",
+                            price: "",
+                            airline: "",
+                            flightNumber: "",
+                            departureAirport: "",
+                            arrivalAirport: "",
+                            departureTime: tripStartDate ? `${tripStartDate}T10:00` : "",
+                            arrivalTime: "",
+                            confirmationNumber: "",
+                            checkInDate: tripStartDate ?? "",
+                            nights: "1",
+                            autoRegisterExpense: false,
+                            paidBy: currentMemberId,
+                            splitMembers: members.map(m => m.id),
+                            startTimezone: "+09:00",
+                            endTimezone: "+09:00",
+                        });
+                    }}
+                >
+                    + 旅程を追加
+                </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-md max-h-[80vh] overflow-y-auto">
+                <DialogHeader>
+                    <DialogTitle>{editItemId ? "旅程を編集" : "旅程を追加"}</DialogTitle>
+                    <DialogDescription>
+                        {editItemId ? "旅程の内容を修正します" : "フライト、ホテル、アクティビティなどを追加"}
+                    </DialogDescription>
+                </DialogHeader>
+                <form onSubmit={handleSubmit} className="space-y-4">
+                    <div className="space-y-2">
+                        <Label>種類</Label>
+                        <Select value={formData.type} onValueChange={(v) => {
+                            const updates: any = { type: v };
+                            if (v === "hotel" && !formData.startTime && formData.date) {
+                                updates.startTime = `${formData.date}T15:00`;
+                            }
+                            setFormData({ ...formData, ...updates });
+                        }}>
+                            <SelectTrigger>
+                                <SelectValue placeholder="種類を選択してください" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                {Object.entries(ITEM_TYPES).map(([key, { label, emoji }]) => (
+                                    <SelectItem key={key} value={key}>
+                                        {emoji} {label}
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                    </div>
+
+                    <div className="space-y-2">
+                        <Label htmlFor="title">タイトル *</Label>
+                        <Input
+                            id="title"
+                            value={formData.title}
+                            onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                            placeholder={formData.type === "flight" ? "羽田 → ホノルル" : "例: 首里城観光"}
+                            required
+                        />
+                    </div>
+
+                    {/* Flight specific fields */}
+                    {formData.type === "flight" && (
+                        <>
+                            <div className="p-3 border rounded-lg bg-blue-50/50 dark:bg-blue-900/10 border-blue-200 dark:border-blue-800 space-y-2">
+                                <p className="text-[11px] text-blue-700 dark:text-blue-300 font-medium flex items-center gap-1">
+                                    <span>✨</span> 便名をスクショから自動入力する
+                                </p>
+                                <input
+                                    type="file"
+                                    id="flight-upload-dialog"
+                                    className="hidden"
+                                    accept="image/*"
+                                    onChange={handleFileChange}
+                                    disabled={analysisLoading}
+                                />
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    asChild
+                                    disabled={analysisLoading}
+                                    className="w-full bg-white dark:bg-gray-900 border-blue-200 text-blue-600 hover:bg-blue-50"
+                                >
+                                    <label htmlFor="flight-upload-dialog" className="cursor-pointer">
+                                        {analysisLoading ? "⏳ 解析中..." : "✈️ 予約スクショを読み込む"}
+                                    </label>
+                                </Button>
+                            </div>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="space-y-2">
+                                    <Label htmlFor="airline">航空会社</Label>
+                                    <Input
+                                        id="airline"
+                                        value={formData.airline}
+                                        onChange={(e) => setFormData({ ...formData, airline: e.target.value })}
+                                        placeholder="JAL"
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label htmlFor="flightNumber">便名</Label>
+                                    <Input
+                                        id="flightNumber"
+                                        value={formData.flightNumber}
+                                        onChange={(e) => setFormData({ ...formData, flightNumber: e.target.value })}
+                                        placeholder="JL784"
+                                    />
+                                </div>
+                            </div>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="space-y-2">
+                                    <Label htmlFor="departureAirport">出発空港</Label>
+                                    <Input
+                                        id="departureAirport"
+                                        value={formData.departureAirport}
+                                        onChange={(e) => setFormData({ ...formData, departureAirport: e.target.value })}
+                                        placeholder="HND"
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label htmlFor="arrivalAirport">到着空港</Label>
+                                    <Input
+                                        id="arrivalAirport"
+                                        value={formData.arrivalAirport}
+                                        onChange={(e) => setFormData({ ...formData, arrivalAirport: e.target.value })}
+                                        placeholder="HNL"
+                                    />
+                                </div>
+                            </div>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="space-y-2">
+                                    <Label htmlFor="departureTime">出発日時</Label>
+                                    <Input
+                                        id="departureTime"
+                                        type="datetime-local"
+                                        value={formData.departureTime}
+                                        onChange={(e) => {
+                                            const val = e.target.value;
+                                            setFormData({
+                                                ...formData,
+                                                departureTime: val,
+                                                date: val ? val.split("T")[0] : formData.date
+                                            });
+                                        }}
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label htmlFor="arrivalTime">到着日時</Label>
+                                    <Input
+                                        id="arrivalTime"
+                                        type="datetime-local"
+                                        value={formData.arrivalTime}
+                                        onChange={(e) => setFormData({ ...formData, arrivalTime: e.target.value })}
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="space-y-4">
+                                <div className="space-y-2">
+                                    <Label className="text-xs text-muted-foreground">出発タイムゾーン</Label>
+                                    <Select value={formData.startTimezone} onValueChange={(v) => setFormData({ ...formData, startTimezone: v })}>
+                                        <SelectTrigger className="text-xs h-8">
+                                            <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {TIMEZONES.map((tz) => (
+                                                <SelectItem key={tz.value} value={tz.value} className="text-xs">
+                                                    {tz.label}
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                                <div className="space-y-2">
+                                    <Label className="text-xs text-muted-foreground">到着タイムゾーン</Label>
+                                    <Select value={formData.endTimezone} onValueChange={(v) => setFormData({ ...formData, endTimezone: v })}>
+                                        <SelectTrigger className="text-xs h-8">
+                                            <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {TIMEZONES.map((tz) => (
+                                                <SelectItem key={tz.value} value={tz.value} className="text-xs">
+                                                    {tz.label}
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                            </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="confirmationNumber">予約番号</Label>
+                                <Input
+                                    id="confirmationNumber"
+                                    value={formData.confirmationNumber}
+                                    onChange={(e) => setFormData({ ...formData, confirmationNumber: e.target.value })}
+                                />
+                            </div>
+                        </>
+                    )}
+
+                    {/* Hotel specific fields */}
+
+                    {formData.type !== "flight" && (
+                        <>
+                            <div className="space-y-2">
+                                <Label htmlFor="date">日付</Label>
+                                <Input
+                                    id="date"
+                                    type="date"
+                                    value={formData.date}
+                                    onChange={(e) => {
+                                        const val = e.target.value;
+                                        const updates: any = { date: val };
+
+                                        // ホテルの場合、日付を変更したらチェックイン日時の日付も合わせる
+                                        if (formData.type === "hotel" && val) {
+                                            const currentTime = formData.startTime && formData.startTime.includes("T")
+                                                ? formData.startTime.split("T")[1]
+                                                : "15:00";
+                                            updates.startTime = `${val}T${currentTime}`;
+                                        }
+
+                                        setFormData({ ...formData, ...updates });
+                                    }}
+                                />
+                            </div>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="space-y-2">
+                                    <Label htmlFor="startTime">
+                                        {formData.type === "hotel" ? "チェックイン日時" : "開始時刻"}
+                                    </Label>
+                                    <Input
+                                        id="startTime"
+                                        type={formData.type === "hotel" ? "datetime-local" : "time"}
+                                        value={formData.startTime}
+                                        onChange={(e) => {
+                                            const val = e.target.value;
+                                            setFormData({
+                                                ...formData,
+                                                startTime: val,
+                                                // もしhotelなら、開始日の日付をdateにもセットしておく（グループ化用）
+                                                date: (formData.type === "hotel" && val) ? val.split("T")[0] : formData.date
+                                            });
+                                        }}
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label htmlFor="endTime">
+                                        {formData.type === "hotel" ? "チェックアウト日時" : "終了時刻"}
+                                    </Label>
+                                    <Input
+                                        id="endTime"
+                                        type={formData.type === "hotel" ? "datetime-local" : "time"}
+                                        value={formData.endTime}
+                                        onChange={(e) => setFormData({ ...formData, endTime: e.target.value })}
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="space-y-4">
+                                <div className="space-y-2">
+                                    <Label className="text-xs text-muted-foreground">{formData.type === "hotel" ? "チェックイン タイムゾーン" : "開始タイムゾーン"}</Label>
+                                    <Select value={formData.startTimezone} onValueChange={(v) => setFormData({ ...formData, startTimezone: v, endTimezone: formData.type === "hotel" ? formData.endTimezone : v })}>
+                                        <SelectTrigger className="text-xs h-8">
+                                            <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {TIMEZONES.map((tz) => (
+                                                <SelectItem key={tz.value} value={tz.value} className="text-xs">
+                                                    {tz.label}
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                                <div className="space-y-2">
+                                    <Label className="text-xs text-muted-foreground">{formData.type === "hotel" ? "チェックアウト タイムゾーン" : "終了タイムゾーン"}</Label>
+                                    <Select value={formData.endTimezone} onValueChange={(v) => setFormData({ ...formData, endTimezone: v })}>
+                                        <SelectTrigger className="text-xs h-8">
+                                            <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {TIMEZONES.map((tz) => (
+                                                <SelectItem key={tz.value} value={tz.value} className="text-xs">
+                                                    {tz.label}
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                            </div>
+                        </>
+                    )}
+
+                    <div className="space-y-2">
+                        <Label htmlFor="location">場所</Label>
+                        <Input
+                            id="location"
+                            value={formData.location}
+                            onChange={(e) => setFormData({ ...formData, location: e.target.value })}
+                            placeholder="住所や場所名"
+                        />
+                    </div>
+
+                    <div className="space-y-2">
+                        <Label htmlFor="notes">メモ</Label>
+                        <Input
+                            id="notes"
+                            value={formData.notes}
+                            onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                            placeholder="備考など"
+                        />
+                    </div>
+
+                    <div className="space-y-4 border rounded-lg p-4 bg-gray-50 dark:bg-gray-900/50">
+                        <div className="space-y-2">
+                            <Label htmlFor="price">金額（円）</Label>
+                            <Input
+                                id="price"
+                                type="number"
+                                value={formData.price}
+                                onChange={(e) => setFormData({ ...formData, price: e.target.value })}
+                                placeholder="0"
+                            />
+                        </div>
+
+                        <div className="flex items-center space-x-2">
+                            <input
+                                type="checkbox"
+                                id="autoRegisterExpense"
+                                checked={formData.autoRegisterExpense}
+                                onChange={(e) => setFormData({ ...formData, autoRegisterExpense: e.target.checked })}
+                                className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                            />
+                            <Label htmlFor="autoRegisterExpense" className="cursor-pointer font-normal">
+                                費用としても登録する
+                            </Label>
+                        </div>
+
+                        {formData.autoRegisterExpense && (
+                            <div className="space-y-4 pl-6 border-l-2 border-gray-200 dark:border-gray-700 ml-2">
+                                <div className="space-y-2">
+                                    <Label>支払った人</Label>
+                                    <Select
+                                        value={formData.paidBy}
+                                        onValueChange={(v) => setFormData({ ...formData, paidBy: v })}
+                                    >
+                                        <SelectTrigger>
+                                            <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {members.map((member) => (
+                                                <SelectItem key={member.id} value={member.id}>
+                                                    {member.profiles?.display_name || member.display_name_override || "不明なユーザー"}
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+
+                                <div className="space-y-2">
+                                    <Label>割り勘対象</Label>
+                                    <div className="space-y-2">
+                                        {members.map((member) => (
+                                            <div key={member.id} className="flex items-center space-x-2">
+                                                <input
+                                                    type="checkbox"
+                                                    id={`split-${member.id}`}
+                                                    checked={formData.splitMembers.includes(member.id)}
+                                                    onChange={(e) => {
+                                                        const checked = e.target.checked;
+                                                        setFormData(prev => ({
+                                                            ...prev,
+                                                            splitMembers: checked
+                                                                ? [...prev.splitMembers, member.id]
+                                                                : prev.splitMembers.filter(id => id !== member.id)
+                                                        }));
+                                                    }}
+                                                    className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                                />
+                                                <Label
+                                                    htmlFor={`split-${member.id}`}
+                                                    className="cursor-pointer font-normal"
+                                                >
+                                                    {member.profiles?.display_name || member.display_name_override || "不明なユーザー"}
+                                                </Label>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+
+                    <Button type="submit" className="w-full" disabled={loading}>
+                        {loading ? (editItemId ? "更新中..." : "追加中...") : (editItemId ? "更新する" : "追加する")}
+                    </Button>
+                </form>
+            </DialogContent>
+        </Dialog>
+    );
+
     return (
         <div className="space-y-1">
-            <div className="flex justify-end mb-1">
-                <Dialog open={dialogOpen} onOpenChange={(val) => {
-                    setDialogOpen(val);
-                    if (!val) setEditItemId(null);
-                }}>
-                    <DialogTrigger asChild>
-                        <Button
-                            className="bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700"
-                            onClick={() => {
-                                setEditItemId(null);
-                                setFormData({
-                                    type: "",
-                                    title: "",
-                                    date: tripStartDate ?? "",
-                                    startTime: "",
-                                    endTime: "",
-                                    location: "",
-                                    notes: "",
-                                    price: "",
-                                    airline: "",
-                                    flightNumber: "",
-                                    departureAirport: "",
-                                    arrivalAirport: "",
-                                    departureTime: tripStartDate ? `${tripStartDate}T10:00` : "",
-                                    arrivalTime: "",
-                                    confirmationNumber: "",
-                                    checkInDate: tripStartDate ?? "",
-                                    nights: "1",
-                                    autoRegisterExpense: false,
-                                    paidBy: currentMemberId,
-                                    splitMembers: members.map(m => m.id),
-                                    startTimezone: "+09:00",
-                                    endTimezone: "+09:00",
-                                });
-                            }}
-                        >
-                            + 旅程を追加
-                        </Button>
-                    </DialogTrigger>
-                    <DialogContent className="max-w-md max-h-[80vh] overflow-y-auto">
-                        <DialogHeader>
-                            <DialogTitle>{editItemId ? "旅程を編集" : "旅程を追加"}</DialogTitle>
-                            <DialogDescription>
-                                {editItemId ? "旅程の内容を修正します" : "フライト、ホテル、アクティビティなどを追加"}
-                            </DialogDescription>
-                        </DialogHeader>
-                        <form onSubmit={handleSubmit} className="space-y-4">
-                            <div className="space-y-2">
-                                <Label>種類</Label>
-                                <Select value={formData.type} onValueChange={(v) => {
-                                    const updates: any = { type: v };
-                                    if (v === "hotel" && !formData.startTime && formData.date) {
-                                        updates.startTime = `${formData.date}T15:00`;
-                                    }
-                                    setFormData({ ...formData, ...updates });
-                                }}>
-                                    <SelectTrigger>
-                                        <SelectValue placeholder="種類を選択してください" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        {Object.entries(ITEM_TYPES).map(([key, { label, emoji }]) => (
-                                            <SelectItem key={key} value={key}>
-                                                {emoji} {label}
-                                            </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
-                            </div>
-
-                            <div className="space-y-2">
-                                <Label htmlFor="title">タイトル *</Label>
-                                <Input
-                                    id="title"
-                                    value={formData.title}
-                                    onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                                    placeholder={formData.type === "flight" ? "羽田 → ホノルル" : "例: 首里城観光"}
-                                    required
-                                />
-                            </div>
-
-                            {/* Flight specific fields */}
-                            {formData.type === "flight" && (
-                                <>
-                                    <div className="p-3 border rounded-lg bg-blue-50/50 dark:bg-blue-900/10 border-blue-200 dark:border-blue-800 space-y-2">
-                                        <p className="text-[11px] text-blue-700 dark:text-blue-300 font-medium flex items-center gap-1">
-                                            <span>✨</span> 便名をスクショから自動入力する
-                                        </p>
-                                        <input
-                                            type="file"
-                                            id="flight-upload-dialog"
-                                            className="hidden"
-                                            accept="image/*"
-                                            onChange={handleFileChange}
-                                            disabled={analysisLoading}
-                                        />
-                                        <Button
-                                            type="button"
-                                            variant="outline"
-                                            size="sm"
-                                            asChild
-                                            disabled={analysisLoading}
-                                            className="w-full bg-white dark:bg-gray-900 border-blue-200 text-blue-600 hover:bg-blue-50"
-                                        >
-                                            <label htmlFor="flight-upload-dialog" className="cursor-pointer">
-                                                {analysisLoading ? "⏳ 解析中..." : "✈️ 予約スクショを読み込む"}
-                                            </label>
-                                        </Button>
-                                    </div>
-                                    <div className="grid grid-cols-2 gap-4">
-                                        <div className="space-y-2">
-                                            <Label htmlFor="airline">航空会社</Label>
-                                            <Input
-                                                id="airline"
-                                                value={formData.airline}
-                                                onChange={(e) => setFormData({ ...formData, airline: e.target.value })}
-                                                placeholder="JAL"
-                                            />
-                                        </div>
-                                        <div className="space-y-2">
-                                            <Label htmlFor="flightNumber">便名</Label>
-                                            <Input
-                                                id="flightNumber"
-                                                value={formData.flightNumber}
-                                                onChange={(e) => setFormData({ ...formData, flightNumber: e.target.value })}
-                                                placeholder="JL784"
-                                            />
-                                        </div>
-                                    </div>
-                                    <div className="grid grid-cols-2 gap-4">
-                                        <div className="space-y-2">
-                                            <Label htmlFor="departureAirport">出発空港</Label>
-                                            <Input
-                                                id="departureAirport"
-                                                value={formData.departureAirport}
-                                                onChange={(e) => setFormData({ ...formData, departureAirport: e.target.value })}
-                                                placeholder="HND"
-                                            />
-                                        </div>
-                                        <div className="space-y-2">
-                                            <Label htmlFor="arrivalAirport">到着空港</Label>
-                                            <Input
-                                                id="arrivalAirport"
-                                                value={formData.arrivalAirport}
-                                                onChange={(e) => setFormData({ ...formData, arrivalAirport: e.target.value })}
-                                                placeholder="HNL"
-                                            />
-                                        </div>
-                                    </div>
-                                    <div className="grid grid-cols-2 gap-4">
-                                        <div className="space-y-2">
-                                            <Label htmlFor="departureTime">出発日時</Label>
-                                            <Input
-                                                id="departureTime"
-                                                type="datetime-local"
-                                                value={formData.departureTime}
-                                                onChange={(e) => {
-                                                    const val = e.target.value;
-                                                    setFormData({
-                                                        ...formData,
-                                                        departureTime: val,
-                                                        date: val ? val.split("T")[0] : formData.date
-                                                    });
-                                                }}
-                                            />
-                                        </div>
-                                        <div className="space-y-2">
-                                            <Label htmlFor="arrivalTime">到着日時</Label>
-                                            <Input
-                                                id="arrivalTime"
-                                                type="datetime-local"
-                                                value={formData.arrivalTime}
-                                                onChange={(e) => setFormData({ ...formData, arrivalTime: e.target.value })}
-                                            />
-                                        </div>
-                                    </div>
-
-                                    <div className="space-y-4">
-                                        <div className="space-y-2">
-                                            <Label className="text-xs text-muted-foreground">出発タイムゾーン</Label>
-                                            <Select value={formData.startTimezone} onValueChange={(v) => setFormData({ ...formData, startTimezone: v })}>
-                                                <SelectTrigger className="text-xs h-8">
-                                                    <SelectValue />
-                                                </SelectTrigger>
-                                                <SelectContent>
-                                                    {TIMEZONES.map((tz) => (
-                                                        <SelectItem key={tz.value} value={tz.value} className="text-xs">
-                                                            {tz.label}
-                                                        </SelectItem>
-                                                    ))}
-                                                </SelectContent>
-                                            </Select>
-                                        </div>
-                                        <div className="space-y-2">
-                                            <Label className="text-xs text-muted-foreground">到着タイムゾーン</Label>
-                                            <Select value={formData.endTimezone} onValueChange={(v) => setFormData({ ...formData, endTimezone: v })}>
-                                                <SelectTrigger className="text-xs h-8">
-                                                    <SelectValue />
-                                                </SelectTrigger>
-                                                <SelectContent>
-                                                    {TIMEZONES.map((tz) => (
-                                                        <SelectItem key={tz.value} value={tz.value} className="text-xs">
-                                                            {tz.label}
-                                                        </SelectItem>
-                                                    ))}
-                                                </SelectContent>
-                                            </Select>
-                                        </div>
-                                    </div>
-                                    <div className="space-y-2">
-                                        <Label htmlFor="confirmationNumber">予約番号</Label>
-                                        <Input
-                                            id="confirmationNumber"
-                                            value={formData.confirmationNumber}
-                                            onChange={(e) => setFormData({ ...formData, confirmationNumber: e.target.value })}
-                                        />
-                                    </div>
-                                </>
-                            )}
-
-                            {/* Hotel specific fields */}
-
-                            {formData.type !== "flight" && (
-                                <>
-                                    <div className="space-y-2">
-                                        <Label htmlFor="date">日付</Label>
-                                        <Input
-                                            id="date"
-                                            type="date"
-                                            value={formData.date}
-                                            onChange={(e) => {
-                                                const val = e.target.value;
-                                                const updates: any = { date: val };
-
-                                                // ホテルの場合、日付を変更したらチェックイン日時の日付も合わせる
-                                                if (formData.type === "hotel" && val) {
-                                                    const currentTime = formData.startTime && formData.startTime.includes("T")
-                                                        ? formData.startTime.split("T")[1]
-                                                        : "15:00";
-                                                    updates.startTime = `${val}T${currentTime}`;
-                                                }
-
-                                                setFormData({ ...formData, ...updates });
-                                            }}
-                                        />
-                                    </div>
-                                    <div className="grid grid-cols-2 gap-4">
-                                        <div className="space-y-2">
-                                            <Label htmlFor="startTime">
-                                                {formData.type === "hotel" ? "チェックイン日時" : "開始時刻"}
-                                            </Label>
-                                            <Input
-                                                id="startTime"
-                                                type={formData.type === "hotel" ? "datetime-local" : "time"}
-                                                value={formData.startTime}
-                                                onChange={(e) => {
-                                                    const val = e.target.value;
-                                                    setFormData({
-                                                        ...formData,
-                                                        startTime: val,
-                                                        // もしhotelなら、開始日の日付をdateにもセットしておく（グループ化用）
-                                                        date: (formData.type === "hotel" && val) ? val.split("T")[0] : formData.date
-                                                    });
-                                                }}
-                                            />
-                                        </div>
-                                        <div className="space-y-2">
-                                            <Label htmlFor="endTime">
-                                                {formData.type === "hotel" ? "チェックアウト日時" : "終了時刻"}
-                                            </Label>
-                                            <Input
-                                                id="endTime"
-                                                type={formData.type === "hotel" ? "datetime-local" : "time"}
-                                                value={formData.endTime}
-                                                onChange={(e) => setFormData({ ...formData, endTime: e.target.value })}
-                                            />
-                                        </div>
-                                    </div>
-
-                                    <div className="space-y-4">
-                                        <div className="space-y-2">
-                                            <Label className="text-xs text-muted-foreground">{formData.type === "hotel" ? "チェックイン タイムゾーン" : "開始タイムゾーン"}</Label>
-                                            <Select value={formData.startTimezone} onValueChange={(v) => setFormData({ ...formData, startTimezone: v, endTimezone: formData.type === "hotel" ? formData.endTimezone : v })}>
-                                                <SelectTrigger className="text-xs h-8">
-                                                    <SelectValue />
-                                                </SelectTrigger>
-                                                <SelectContent>
-                                                    {TIMEZONES.map((tz) => (
-                                                        <SelectItem key={tz.value} value={tz.value} className="text-xs">
-                                                            {tz.label}
-                                                        </SelectItem>
-                                                    ))}
-                                                </SelectContent>
-                                            </Select>
-                                        </div>
-                                        <div className="space-y-2">
-                                            <Label className="text-xs text-muted-foreground">{formData.type === "hotel" ? "チェックアウト タイムゾーン" : "終了タイムゾーン"}</Label>
-                                            <Select value={formData.endTimezone} onValueChange={(v) => setFormData({ ...formData, endTimezone: v })}>
-                                                <SelectTrigger className="text-xs h-8">
-                                                    <SelectValue />
-                                                </SelectTrigger>
-                                                <SelectContent>
-                                                    {TIMEZONES.map((tz) => (
-                                                        <SelectItem key={tz.value} value={tz.value} className="text-xs">
-                                                            {tz.label}
-                                                        </SelectItem>
-                                                    ))}
-                                                </SelectContent>
-                                            </Select>
-                                        </div>
-                                    </div>
-                                </>
-                            )}
-
-                            <div className="space-y-2">
-                                <Label htmlFor="location">場所</Label>
-                                <Input
-                                    id="location"
-                                    value={formData.location}
-                                    onChange={(e) => setFormData({ ...formData, location: e.target.value })}
-                                    placeholder="住所や場所名"
-                                />
-                            </div>
-
-                            <div className="space-y-2">
-                                <Label htmlFor="notes">メモ</Label>
-                                <Input
-                                    id="notes"
-                                    value={formData.notes}
-                                    onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                                    placeholder="備考など"
-                                />
-                            </div>
-
-                            <div className="space-y-4 border rounded-lg p-4 bg-gray-50 dark:bg-gray-900/50">
-                                <div className="space-y-2">
-                                    <Label htmlFor="price">金額（円）</Label>
-                                    <Input
-                                        id="price"
-                                        type="number"
-                                        value={formData.price}
-                                        onChange={(e) => setFormData({ ...formData, price: e.target.value })}
-                                        placeholder="0"
-                                    />
-                                </div>
-
-                                <div className="flex items-center space-x-2">
-                                    <input
-                                        type="checkbox"
-                                        id="autoRegisterExpense"
-                                        checked={formData.autoRegisterExpense}
-                                        onChange={(e) => setFormData({ ...formData, autoRegisterExpense: e.target.checked })}
-                                        className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                                    />
-                                    <Label htmlFor="autoRegisterExpense" className="cursor-pointer font-normal">
-                                        費用としても登録する
-                                    </Label>
-                                </div>
-
-                                {formData.autoRegisterExpense && (
-                                    <div className="space-y-4 pl-6 border-l-2 border-gray-200 dark:border-gray-700 ml-2">
-                                        <div className="space-y-2">
-                                            <Label>支払った人</Label>
-                                            <Select
-                                                value={formData.paidBy}
-                                                onValueChange={(v) => setFormData({ ...formData, paidBy: v })}
-                                            >
-                                                <SelectTrigger>
-                                                    <SelectValue />
-                                                </SelectTrigger>
-                                                <SelectContent>
-                                                    {members.map((member) => (
-                                                        <SelectItem key={member.id} value={member.id}>
-                                                            {member.profiles?.display_name || member.display_name_override || "不明なユーザー"}
-                                                        </SelectItem>
-                                                    ))}
-                                                </SelectContent>
-                                            </Select>
-                                        </div>
-
-                                        <div className="space-y-2">
-                                            <Label>割り勘対象</Label>
-                                            <div className="space-y-2">
-                                                {members.map((member) => (
-                                                    <div key={member.id} className="flex items-center space-x-2">
-                                                        <input
-                                                            type="checkbox"
-                                                            id={`split-${member.id}`}
-                                                            checked={formData.splitMembers.includes(member.id)}
-                                                            onChange={(e) => {
-                                                                const checked = e.target.checked;
-                                                                setFormData(prev => ({
-                                                                    ...prev,
-                                                                    splitMembers: checked
-                                                                        ? [...prev.splitMembers, member.id]
-                                                                        : prev.splitMembers.filter(id => id !== member.id)
-                                                                }));
-                                                            }}
-                                                            className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                                                        />
-                                                        <Label
-                                                            htmlFor={`split-${member.id}`}
-                                                            className="cursor-pointer font-normal"
-                                                        >
-                                                            {member.profiles?.display_name || member.display_name_override || "不明なユーザー"}
-                                                        </Label>
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        </div>
-                                    </div>
-                                )}
-                            </div>
-
-                            <Button type="submit" className="w-full" disabled={loading}>
-                                {loading ? (editItemId ? "更新中..." : "追加中...") : (editItemId ? "更新する" : "追加する")}
-                            </Button>
-                        </form>
-                    </DialogContent>
-                </Dialog>
-            </div>
-
             {items.length === 0 ? (
-                <Card className="border-dashed border-2">
-                    <CardContent className="py-12 text-center">
-                        <div className="w-16 h-16 mx-auto mb-4 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center">
-                            <span className="text-3xl">🗓️</span>
-                        </div>
-                        <h3 className="text-lg font-medium mb-2">旅程がありません</h3>
-                        <p className="text-muted-foreground">
-                            フライトやホテル、観光地を追加しましょう
-                        </p>
-                    </CardContent>
-                </Card>
+                <div className="space-y-4">
+                    <div className="flex justify-end">{addButton}</div>
+                    <Card className="border-dashed border-2">
+                        <CardContent className="py-12 text-center">
+                            <div className="w-16 h-16 mx-auto mb-4 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center">
+                                <span className="text-3xl">🗓️</span>
+                            </div>
+                            <h3 className="text-lg font-medium mb-2">旅程がありません</h3>
+                            <p className="text-muted-foreground">
+                                フライトやホテル、観光地を追加しましょう
+                            </p>
+                        </CardContent>
+                    </Card>
+                </div>
             ) : (
                 <div className="space-y-4 relative before:absolute before:inset-0 before:left-4 before:h-full before:w-0.5 before:bg-muted before:z-0">
-                    {sortedDates.map((date) => {
+                    {sortedDates.map((date, index) => {
                         // Helper for formatting times
                         const formatLocalTime = (isoString: string | null, offset: string | null) => {
                             if (!isoString) return null;
@@ -918,21 +921,24 @@ export function ItineraryTab({ tripId, items, members, currentMemberId, tripStar
 
                         return (
                             <div key={date} className="relative z-10">
-                                <div className="flex items-center gap-4 mb-3">
-                                    <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center text-white shrink-0 z-20 shadow-md">
-                                        <Clock className="h-4 w-4" />
+                                <div className="flex items-center justify-between gap-4 mb-2">
+                                    <div className="flex items-center gap-4">
+                                        <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center text-white shrink-0 z-20 shadow-md">
+                                            <Clock className="h-4 w-4" />
+                                        </div>
+                                        <h3 className="text-lg font-bold">
+                                            {date === "未定"
+                                                ? "📅 日付未定"
+                                                : `${new Date(date).toLocaleDateString("ja-JP", {
+                                                    month: "long",
+                                                    day: "numeric",
+                                                    weekday: "short",
+                                                })}`}
+                                        </h3>
                                     </div>
-                                    <h3 className="text-lg font-bold">
-                                        {date === "未定"
-                                            ? "📅 日付未定"
-                                            : `${new Date(date).toLocaleDateString("ja-JP", {
-                                                month: "long",
-                                                day: "numeric",
-                                                weekday: "short",
-                                            })}`}
-                                    </h3>
+                                    {index === 0 && addButton}
                                 </div>
-                                <div className="space-y-4 ml-10">
+                                <div className="space-y-2.5 ml-10">
                                     {/* Hotel Stay Banner - Integrated into the list flow */}
                                     {(hotelStaysPerDate[date] || []).map(hotel => {
                                         const isCheckIn = date === hotel.check_in_date;
@@ -1009,7 +1015,7 @@ export function ItineraryTab({ tripId, items, members, currentMemberId, tripStar
                                         return (
                                             <Card key={item.id} className="relative transition-all hover:shadow-lg border-l-4 border-l-blue-500 overflow-hidden">
                                                 <CardContent className="p-0">
-                                                    <div className="p-2 sm:p-3">
+                                                    <div className="p-1.5 sm:p-2.5">
                                                         <div className="flex items-start justify-between gap-2">
                                                             <div className="flex-1 min-w-0">
                                                                 {/* Time: Visible and prominent as requested */}
@@ -1112,8 +1118,7 @@ export function ItineraryTab({ tripId, items, members, currentMemberId, tripStar
                         );
                     })}
                 </div>
-            )
-            }
+            )}
         </div>
     );
 }
