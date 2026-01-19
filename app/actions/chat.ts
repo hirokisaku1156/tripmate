@@ -43,9 +43,9 @@ ${JSON.stringify(context.places, null, 2)}
 
 これらの情報を踏まえて、具体的で実用的なアドバイスをしてください。返信は簡潔かつ親しみやすい敬語で行ってください。`;
 
-    // 3. Geminiで回答生成 (最新の 2.0 Flash を使用)
+    // 3. Geminiで回答生成 (現在最も安定して動作する 2.5 Flash を使用)
     const model = genAI.getGenerativeModel({
-        model: "gemini-2.0-flash",
+        model: "gemini-2.5-flash",
         systemInstruction: systemPrompt
     });
 

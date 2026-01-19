@@ -20,11 +20,10 @@ async function listModels() {
     const genAI = new GoogleGenerativeAI(apiKey);
     console.log("Testing common model names...");
     const models = [
-        "gemini-1.5-flash",
-        "gemini-1.5-flash-latest",
-        "gemini-1.5-pro",
         "gemini-2.0-flash",
-        "gemini-2.0-flash-exp"
+        "gemini-2.0-flash-lite",
+        "gemini-2.5-flash",
+        "gemini-2.5-flash-lite"
     ];
 
     for (const m of models) {
