@@ -98,7 +98,9 @@ export interface Database {
                     title: string;
                     date: string | null;
                     start_time: string | null;
+                    start_timezone: string | null;
                     end_time: string | null;
+                    end_timezone: string | null;
                     timezone: string | null;
                     location: string | null;
                     address: string | null;
@@ -112,6 +114,7 @@ export interface Database {
                     confirmation_number: string | null;
                     check_in_date: string | null;
                     check_out_date: string | null;
+                    is_ai_generated: boolean;
                     created_by: string | null;
                     created_at: string;
                     updated_at: string;
@@ -137,6 +140,7 @@ export interface Database {
                     confirmation_number?: string | null;
                     check_in_date?: string | null;
                     check_out_date?: string | null;
+                    is_ai_generated?: boolean;
                     created_by?: string | null;
                     created_at?: string;
                     updated_at?: string;
@@ -162,6 +166,7 @@ export interface Database {
                     confirmation_number?: string | null;
                     check_in_date?: string | null;
                     check_out_date?: string | null;
+                    is_ai_generated?: boolean;
                     created_by?: string | null;
                     created_at?: string;
                     updated_at?: string;
@@ -184,6 +189,7 @@ export interface Database {
                     price: number | null;
                     price_currency: string;
                     is_added_to_itinerary: boolean;
+                    is_ai_generated: boolean;
                     created_by: string | null;
                     created_at: string;
                 };
@@ -239,6 +245,7 @@ export interface Database {
                     paid_by: string | null;
                     date: string | null;
                     is_settled: boolean;
+                    is_ai_generated: boolean;
                     created_at: string;
                 };
                 Insert: {
@@ -253,6 +260,7 @@ export interface Database {
                     paid_by?: string | null;
                     date?: string | null;
                     is_settled?: boolean;
+                    is_ai_generated?: boolean;
                     created_at?: string;
                 };
                 Update: {
@@ -267,6 +275,7 @@ export interface Database {
                     paid_by?: string | null;
                     date?: string | null;
                     is_settled?: boolean;
+                    is_ai_generated?: boolean;
                     created_at?: string;
                 };
             };

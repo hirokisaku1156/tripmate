@@ -18,6 +18,8 @@ export async function analyzeFlightScreenshot(base64Image: string) {
   "arrivalAirport": "到着空港名または3レターコード",
   "departureTime": "出発日時",
   "arrivalTime": "到着日時",
+  "departureTimezone": "出発地のタイムゾーンオフセット (例: +09:00, -07:00)",
+  "arrivalTimezone": "到着地のタイムゾーンオフセット (例: +09:00, -07:00)",
   "confirmationNumber": "予約番号/確認番号",
   "title": "フライト名（航空会社+便名などの簡潔なもの）"
 }

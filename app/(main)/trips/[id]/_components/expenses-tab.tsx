@@ -23,7 +23,7 @@ import {
     SelectValue,
 } from "@/components/ui/select";
 import { toast } from "sonner";
-import { MoreHorizontal } from "lucide-react";
+import { MoreHorizontal, Bot } from "lucide-react";
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -43,6 +43,7 @@ interface ExpensesTabProps {
         paid_by: string | null;
         date: string | null;
         is_settled: boolean;
+        is_ai_generated: boolean;
         created_at: string;
     }[];
     expenseSplits: {
@@ -462,6 +463,11 @@ export function ExpensesTab({
                                                         <p className="font-medium">
                                                             {expense.description || cat.label}
                                                         </p>
+                                                        {expense.is_ai_generated && (
+                                                            <Badge variant="outline" className="bg-blue-50 text-blue-600 border-blue-200 gap-1 shrink-0 h-5 px-1.5 text-[10px]">
+                                                                <Bot className="h-3 w-3" /> AI
+                                                            </Badge>
+                                                        )}
                                                         {expense.is_settled && (
                                                             <Badge variant="secondary" className="text-[10px] py-0 h-4 bg-gray-100 text-gray-500">精算済</Badge>
                                                         )}

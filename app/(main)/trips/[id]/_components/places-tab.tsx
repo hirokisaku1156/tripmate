@@ -11,7 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
-import { MoreHorizontal } from "lucide-react";
+import { MoreHorizontal, Bot } from "lucide-react";
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -275,6 +275,11 @@ export function PlacesTab({ tripId, places }: PlacesTabProps) {
                                             <div className="flex items-center justify-between gap-2 mb-1">
                                                 <div className="flex items-center gap-2 min-w-0">
                                                     <h4 className="font-medium truncate">{place.name}</h4>
+                                                    {place.is_ai_generated && (
+                                                        <Badge variant="outline" className="bg-blue-50 text-blue-600 border-blue-200 gap-1 shrink-0 h-5 px-1.5 text-[10px]">
+                                                            <Bot className="h-3 w-3" /> AI
+                                                        </Badge>
+                                                    )}
                                                     <Badge
                                                         variant={place.status === "confirmed" ? "default" : "secondary"}
                                                         className="text-xs shrink-0"

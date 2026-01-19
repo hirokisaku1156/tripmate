@@ -8,7 +8,6 @@ import { ItineraryTab } from "./itinerary-tab";
 import { PlacesTab } from "./places-tab";
 import { MembersTab } from "./members-tab";
 import { ExpensesTab } from "./expenses-tab";
-import { ChatTab } from "./chat-tab";
 import type { Database } from "@/lib/supabase/types";
 
 type Trip = Database["public"]["Tables"]["trips"]["Row"];
@@ -21,13 +20,14 @@ type Expense = Database["public"]["Tables"]["expenses"]["Row"];
 type ExpenseSplit = Database["public"]["Tables"]["expense_splits"]["Row"];
 
 interface TripDetailClientProps {
-    trip: Trip;
-    members: TripMember[];
-    itineraryItems: ItineraryItem[];
-    places: Place[];
-    expenses: Expense[];
-    expenseSplits: ExpenseSplit[];
-    chatMessages: any[];
+    trip: any;
+    members: any[];
+    itineraryItems: any[];
+    places: any[];
+    expenses: any[];
+    expenseSplits: any[];
+    chatSessions: any[];
+    initialChatMessages: any[];
     currentUserId: string;
     isOwner: boolean;
 }
@@ -39,7 +39,8 @@ export function TripDetailClient({
     places,
     expenses,
     expenseSplits,
-    chatMessages,
+    chatSessions,
+    initialChatMessages,
     currentUserId,
     isOwner,
 }: TripDetailClientProps) {
@@ -133,12 +134,6 @@ export function TripDetailClient({
                         >
                             💰 費用
                         </TabsTrigger>
-                        <TabsTrigger
-                            value="chat"
-                            className="rounded-none border-b-2 border-transparent data-[state=active]:border-blue-500 data-[state=active]:bg-transparent px-4 py-3"
-                        >
-                            🤖 AI
-                        </TabsTrigger>
                     </TabsList>
 
                     <TabsContent value="itinerary" className="px-4 py-4">
@@ -182,22 +177,6 @@ export function TripDetailClient({
                                 profiles: m.profiles
                             }))}
                             currentMemberId={currentMemberId}
-                        />
-                    </TabsContent>
-
-                    <TabsContent value="chat" className="px-4 py-4">
-                        <ChatTab
-                            tripId={trip.id}
-                            initialMessages={chatMessages}
-                            context={{
-                                tripName: trip.name,
-                                destinations: trip.destinations,
-                                startDate: trip.start_date,
-                                endDate: trip.end_date,
-                                memberCount: members.length,
-                                itineraryItems: itineraryItems,
-                                places: places
-                            }}
                         />
                     </TabsContent>
                 </Tabs>

@@ -22,7 +22,8 @@ import {
     Utensils,
     Compass,
     Map,
-    Tag
+    Tag,
+    Bot
 } from "lucide-react";
 import {
     DropdownMenu,
@@ -56,6 +57,20 @@ const ITEM_TYPES = {
     other: { label: "その他", emoji: "📌", category: "other", icon: Tag },
 };
 
+const TIMEZONES = [
+    { label: "日本標準時 (JST) +09:00", value: "+09:00" },
+    { label: "ハワイ (ホノルル) -10:00", value: "-10:00" },
+    { label: "米国西海岸 夏時間 (サンフランシスコ/LA) -07:00 (PDT)", value: "-07:00" },
+    { label: "米国西海岸 標準時 (サンフランシスコ/LA) -08:00 (PST)", value: "-08:00" },
+    { label: "米国東海岸 夏時間 (NY/ワシントン) -04:00 (EDT)", value: "-04:00" },
+    { label: "米国東海岸 標準時 (NY/ワシントン) -05:00 (EST)", value: "-05:00" },
+    { label: "協定世界時 (UTC) +00:00", value: "+00:00" },
+    { label: "ヨーロッパ中央 夏時間 (パリ/ベルリン) +02:00 (CEST)", value: "+02:00" },
+    { label: "ヨーロッパ中央 標準時 (パリ/ベルリン) +01:00 (CET)", value: "+01:00" },
+    { label: "オーストラリア東部 (シドニー) +10:00", value: "+10:00" },
+    { label: "シンガポール (SGT) +08:00", value: "+08:00" },
+];
+
 export function ItineraryTab({ tripId, items, members, currentMemberId, tripStartDate }: ItineraryTabProps) {
     const [dialogOpen, setDialogOpen] = useState(false);
     const [loading, setLoading] = useState(false);
@@ -86,6 +101,9 @@ export function ItineraryTab({ tripId, items, members, currentMemberId, tripStar
         autoRegisterExpense: false,
         paidBy: currentMemberId,
         splitMembers: members.map(m => m.id),
+        // Timezone
+        startTimezone: "+09:00",
+        endTimezone: "+09:00",
     });
     const router = useRouter();
     const supabase = createClient();
@@ -99,27 +117,65 @@ export function ItineraryTab({ tripId, items, members, currentMemberId, tripStar
             nights = diff.toString();
         }
 
+        // 既存のタイムゾーンがあればそれを使う、なければデフォルト(+09:00)
+        // ※DBに start_timezone がない古いデータの場合は JST と仮定するしかない
+        const startTz = item.start_timezone || "+09:00";
+        const endTz = item.end_timezone || startTz || "+09:00";
+
+        // UTC時間をローカル時間に変換してinput(time/datetime-local)にセットするためのヘルパー
+        // しかし、JSのDateはブラウザのタイムゾーンに依存するため、ISO文字列を直接操作したほうが正確かもしれない
+        // ここでは簡易的に、UTCとオフセットから「ローカル時間文字列」を生成する
+        // 例: 2024-01-01T10:00:00Z (UTC) で +09:00 なら 2024-01-01T19:00:00 にしたい
+        const toLocalISO = (dateStr: string | null, offsetStr: string) => {
+            if (!dateStr) return "";
+            try {
+                // オフセット文字列 ("+09:00") を分に変換
+                const sign = offsetStr.startsWith("+") ? 1 : -1;
+                const [h, m] = offsetStr.slice(1).split(":").map(Number);
+                const offsetMinutes = sign * ((h * 60) + m);
+
+                const date = new Date(dateStr);
+                // UTC時刻を取得
+                const utc = date.getTime();
+                // オフセット分ずらす
+                const localTime = new Date(utc + (offsetMinutes * 60 * 1000));
+
+                // ISO文字列化して 'Z' をとる (ただし toISOString は UTC に戻してしまうので注意)
+                // ローカル時間を UTC として解釈させて ISO 文字列を取得し、末尾の Z を削るハック
+                return localTime.toISOString().slice(0, 16); // YYYY-MM-DDTHH:mm
+            } catch (e) {
+                return "";
+            }
+        };
+
+        const startTimeLocal = toLocalISO(item.start_time, startTz);
+        const endTimeLocal = toLocalISO(item.end_time, endTz);
+        const depTimeLocal = toLocalISO(item.departure_time, startTz);
+        const arrTimeLocal = toLocalISO(item.arrival_time, endTz);
+
         setFormData({
             type: item.type || "",
             title: item.title || "",
             date: item.date || "",
-            startTime: item.start_time ? new Date(item.start_time).toLocaleTimeString("ja-JP", { hour: "2-digit", minute: "2-digit", hour12: false }) : "",
-            endTime: item.end_time ? new Date(item.end_time).toLocaleTimeString("ja-JP", { hour: "2-digit", minute: "2-digit", hour12: false }) : "",
+            startTime: (item.type === "hotel" && startTimeLocal) ? startTimeLocal : (startTimeLocal ? startTimeLocal.split("T")[1] : ""),
+            endTime: (item.type === "hotel" && endTimeLocal) ? endTimeLocal : (endTimeLocal ? endTimeLocal.split("T")[1] : ""),
             location: item.location || "",
             notes: item.notes || "",
-            price: "", // 既存費用の編集は別途
+            price: "",
             airline: item.airline || "",
             flightNumber: item.flight_number || "",
             departureAirport: item.departure_airport || "",
             arrivalAirport: item.arrival_airport || "",
-            departureTime: item.departure_time ? new Date(item.departure_time).toISOString().slice(0, 16) : "",
-            arrivalTime: item.arrival_time ? new Date(item.arrival_time).toISOString().slice(0, 16) : "",
+            departureTime: depTimeLocal,
+            arrivalTime: arrTimeLocal,
             confirmationNumber: item.confirmation_number || "",
             checkInDate: item.check_in_date || "",
             nights: nights,
             autoRegisterExpense: false,
             paidBy: currentMemberId,
             splitMembers: members.map(m => m.id),
+            startTimezone: startTz,
+            endTimezone: endTz,
         });
         setEditItemId(item.id);
         setDialogOpen(true);
@@ -150,34 +206,59 @@ export function ItineraryTab({ tripId, items, members, currentMemberId, tripStar
             return;
         }
 
-        const insertData: Database["public"]["Tables"]["itinerary_items"]["Insert"] = {
+        const insertData: any = { // 型定義更新待ちのため any
             trip_id: tripId,
             type: formData.type,
             title: formData.title,
             date: formData.date || null,
-            start_time: formData.startTime ? new Date(`${formData.date}T${formData.startTime}`).toISOString() : null,
-            end_time: formData.endTime ? new Date(`${formData.date}T${formData.endTime}`).toISOString() : null,
             location: formData.location || null,
             notes: formData.notes || null,
             created_by: user?.id || null,
+            start_timezone: formData.startTimezone,
+            end_timezone: formData.endTimezone,
         };
+
+        // Flight以外かつHotel以外の場合の通常処理
+        if (formData.type !== "flight" && formData.type !== "hotel") {
+            if (formData.startTime) {
+                insertData.start_time = `${formData.date}T${formData.startTime}:00${formData.startTimezone}`;
+            }
+            if (formData.endTime) {
+                insertData.end_time = `${formData.date}T${formData.endTime}:00${formData.endTimezone}`;
+            }
+        }
+
 
         if (formData.type === "flight") {
             insertData.airline = formData.airline || null;
             insertData.flight_number = formData.flightNumber || null;
             insertData.departure_airport = formData.departureAirport || null;
             insertData.arrival_airport = formData.arrivalAirport || null;
-            insertData.departure_time = formData.departureTime ? new Date(formData.departureTime).toISOString() : null;
-            insertData.arrival_time = formData.arrivalTime ? new Date(formData.arrivalTime).toISOString() : null;
+            insertData.start_timezone = formData.startTimezone; // 出発TZ
+            insertData.end_timezone = formData.endTimezone;     // 到着TZ
+
+            if (formData.departureTime) {
+                insertData.departure_time = `${formData.departureTime}:00${formData.startTimezone}`;
+                // flightの場合 start_time にも departure_time を入れておくとソートしやすい
+                insertData.start_time = insertData.departure_time;
+            }
+            if (formData.arrivalTime) {
+                insertData.arrival_time = `${formData.arrivalTime}:00${formData.endTimezone}`;
+                insertData.end_time = insertData.arrival_time;
+            }
+
             insertData.confirmation_number = formData.confirmationNumber || null;
         }
 
         if (formData.type === "hotel") {
-            insertData.check_in_date = formData.checkInDate || null;
-            if (formData.checkInDate && formData.nights) {
-                const checkIn = new Date(formData.checkInDate);
-                checkIn.setDate(checkIn.getDate() + Number(formData.nights));
-                insertData.check_out_date = checkIn.toISOString().split('T')[0];
+            // Hotelの場合は datetime-local の値 (YYYY-MM-DDTHH:mm) をそのまま使用
+            if (formData.startTime) {
+                insertData.start_time = `${formData.startTime}:00${formData.startTimezone}`;
+                insertData.check_in_date = formData.startTime.split("T")[0];
+            }
+            if (formData.endTime) {
+                insertData.end_time = `${formData.endTime}:00${formData.endTimezone}`;
+                insertData.check_out_date = formData.endTime.split("T")[0];
             }
         }
 
@@ -242,6 +323,8 @@ export function ItineraryTab({ tripId, items, members, currentMemberId, tripStar
                 autoRegisterExpense: false,
                 paidBy: currentMemberId,
                 splitMembers: members.map(m => m.id),
+                startTimezone: "+09:00",
+                endTimezone: "+09:00",
             });
             router.refresh();
         }
@@ -272,6 +355,8 @@ export function ItineraryTab({ tripId, items, members, currentMemberId, tripStar
                     arrivalTime: result.arrivalTime || "",
                     confirmationNumber: result.confirmationNumber || "",
                     date: result.departureTime ? result.departureTime.split("T")[0] : prev.date,
+                    startTimezone: result.departureTimezone || prev.startTimezone,
+                    endTimezone: result.arrivalTimezone || prev.endTimezone,
                 }));
                 // 既にダイアログは開いているはずだが念のため
                 setDialogOpen(true);
@@ -297,19 +382,52 @@ export function ItineraryTab({ tripId, items, members, currentMemberId, tripStar
         return acc;
     }, {} as Record<string, ItineraryItem[]>);
 
-    // 各日付内で時間をソート
-    Object.keys(groupedItems).forEach((date) => {
+    // 各日付グループ内で時間をソート
+    Object.keys(groupedItems).forEach(date => {
         groupedItems[date].sort((a, b) => {
-            const timeA = a.type === "flight" ? a.departure_time : (a.start_time || "");
-            const timeB = b.type === "flight" ? b.departure_time : (b.start_time || "");
-            if (!timeA && !timeB) return 0;
-            if (!timeA) return 1;
-            if (!timeB) return -1;
-            return timeA.localeCompare(timeB);
+            const getTime = (item: ItineraryItem) => {
+                // フライト: 出発時間
+                if (item.type === "flight" && item.departure_time) {
+                    return new Date(item.departure_time).getTime();
+                }
+                // ホテル: チェックイン日 (15:00と仮定)
+                if (item.type === "hotel" && item.check_in_date) {
+                    return new Date(`${item.check_in_date}T15:00:00`).getTime();
+                }
+                // その他: 開始時間
+                if (item.start_time) {
+                    return new Date(item.start_time).getTime();
+                }
+                // 時間未定: 最後へ
+                return 8640000000000000;
+            };
+            return getTime(a) - getTime(b);
         });
     });
 
-    const sortedDates = Object.keys(groupedItems).sort();
+
+    // ホテル滞在の期間マップを作成
+    const datesWithHotels = new Set<string>();
+    const hotelStaysPerDate: Record<string, ItineraryItem[]> = {};
+
+    items.filter(i => i.type === "hotel").forEach(hotel => {
+        if (!hotel.check_in_date || !hotel.check_out_date) return;
+
+        const start = new Date(hotel.check_in_date);
+        const end = new Date(hotel.check_out_date);
+        const current = new Date(start);
+
+        while (current <= end) {
+            const dateStr = current.toISOString().split('T')[0];
+            datesWithHotels.add(dateStr);
+            if (!hotelStaysPerDate[dateStr]) hotelStaysPerDate[dateStr] = [];
+            hotelStaysPerDate[dateStr].push(hotel);
+            current.setDate(current.getDate() + 1);
+        }
+    });
+
+    Object.keys(groupedItems).forEach(d => datesWithHotels.add(d));
+    const sortedDates = Array.from(datesWithHotels).sort();
 
     return (
         <div className="space-y-4">
@@ -344,6 +462,8 @@ export function ItineraryTab({ tripId, items, members, currentMemberId, tripStar
                                     autoRegisterExpense: false,
                                     paidBy: currentMemberId,
                                     splitMembers: members.map(m => m.id),
+                                    startTimezone: "+09:00",
+                                    endTimezone: "+09:00",
                                 });
                             }}
                         >
@@ -360,7 +480,13 @@ export function ItineraryTab({ tripId, items, members, currentMemberId, tripStar
                         <form onSubmit={handleSubmit} className="space-y-4">
                             <div className="space-y-2">
                                 <Label>種類</Label>
-                                <Select value={formData.type} onValueChange={(v) => setFormData({ ...formData, type: v })}>
+                                <Select value={formData.type} onValueChange={(v) => {
+                                    const updates: any = { type: v };
+                                    if (v === "hotel" && !formData.startTime && formData.date) {
+                                        updates.startTime = `${formData.date}T15:00`;
+                                    }
+                                    setFormData({ ...formData, ...updates });
+                                }}>
                                     <SelectTrigger>
                                         <SelectValue placeholder="種類を選択してください" />
                                     </SelectTrigger>
@@ -473,6 +599,39 @@ export function ItineraryTab({ tripId, items, members, currentMemberId, tripStar
                                             />
                                         </div>
                                     </div>
+
+                                    <div className="space-y-4">
+                                        <div className="space-y-2">
+                                            <Label className="text-xs text-muted-foreground">出発タイムゾーン</Label>
+                                            <Select value={formData.startTimezone} onValueChange={(v) => setFormData({ ...formData, startTimezone: v })}>
+                                                <SelectTrigger className="text-xs h-8">
+                                                    <SelectValue />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    {TIMEZONES.map((tz) => (
+                                                        <SelectItem key={tz.value} value={tz.value} className="text-xs">
+                                                            {tz.label}
+                                                        </SelectItem>
+                                                    ))}
+                                                </SelectContent>
+                                            </Select>
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label className="text-xs text-muted-foreground">到着タイムゾーン</Label>
+                                            <Select value={formData.endTimezone} onValueChange={(v) => setFormData({ ...formData, endTimezone: v })}>
+                                                <SelectTrigger className="text-xs h-8">
+                                                    <SelectValue />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    {TIMEZONES.map((tz) => (
+                                                        <SelectItem key={tz.value} value={tz.value} className="text-xs">
+                                                            {tz.label}
+                                                        </SelectItem>
+                                                    ))}
+                                                </SelectContent>
+                                            </Select>
+                                        </div>
+                                    </div>
                                     <div className="space-y-2">
                                         <Label htmlFor="confirmationNumber">予約番号</Label>
                                         <Input
@@ -485,40 +644,8 @@ export function ItineraryTab({ tripId, items, members, currentMemberId, tripStar
                             )}
 
                             {/* Hotel specific fields */}
-                            {formData.type === "hotel" && (
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div className="space-y-2">
-                                        <Label htmlFor="checkInDate">チェックイン</Label>
-                                        <Input
-                                            id="checkInDate"
-                                            type="date"
-                                            value={formData.checkInDate}
-                                            onChange={(e) => setFormData({ ...formData, checkInDate: e.target.value })}
-                                        />
-                                    </div>
-                                    <div className="space-y-2">
-                                        <Label htmlFor="nights">宿泊数</Label>
-                                        <Select
-                                            value={formData.nights}
-                                            onValueChange={(v) => setFormData({ ...formData, nights: v })}
-                                        >
-                                            <SelectTrigger>
-                                                <SelectValue />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 14, 30].map((n) => (
-                                                    <SelectItem key={n} value={n.toString()}>
-                                                        {n}泊
-                                                    </SelectItem>
-                                                ))}
-                                            </SelectContent>
-                                        </Select>
-                                    </div>
-                                </div>
-                            )}
 
-                            {/* Common fields: FlightとHotel以外で日付を表示 */}
-                            {formData.type !== "flight" && formData.type !== "hotel" && (
+                            {formData.type !== "flight" && (
                                 <>
                                     <div className="space-y-2">
                                         <Label htmlFor="date">日付</Label>
@@ -526,27 +653,85 @@ export function ItineraryTab({ tripId, items, members, currentMemberId, tripStar
                                             id="date"
                                             type="date"
                                             value={formData.date}
-                                            onChange={(e) => setFormData({ ...formData, date: e.target.value })}
+                                            onChange={(e) => {
+                                                const val = e.target.value;
+                                                const updates: any = { date: val };
+
+                                                // ホテルの場合、日付を変更したらチェックイン日時の日付も合わせる
+                                                if (formData.type === "hotel" && val) {
+                                                    const currentTime = formData.startTime && formData.startTime.includes("T")
+                                                        ? formData.startTime.split("T")[1]
+                                                        : "15:00";
+                                                    updates.startTime = `${val}T${currentTime}`;
+                                                }
+
+                                                setFormData({ ...formData, ...updates });
+                                            }}
                                         />
                                     </div>
                                     <div className="grid grid-cols-2 gap-4">
                                         <div className="space-y-2">
-                                            <Label htmlFor="startTime">開始時刻</Label>
+                                            <Label htmlFor="startTime">
+                                                {formData.type === "hotel" ? "チェックイン日時" : "開始時刻"}
+                                            </Label>
                                             <Input
                                                 id="startTime"
-                                                type="time"
+                                                type={formData.type === "hotel" ? "datetime-local" : "time"}
                                                 value={formData.startTime}
-                                                onChange={(e) => setFormData({ ...formData, startTime: e.target.value })}
+                                                onChange={(e) => {
+                                                    const val = e.target.value;
+                                                    setFormData({
+                                                        ...formData,
+                                                        startTime: val,
+                                                        // もしhotelなら、開始日の日付をdateにもセットしておく（グループ化用）
+                                                        date: (formData.type === "hotel" && val) ? val.split("T")[0] : formData.date
+                                                    });
+                                                }}
                                             />
                                         </div>
                                         <div className="space-y-2">
-                                            <Label htmlFor="endTime">終了時刻</Label>
+                                            <Label htmlFor="endTime">
+                                                {formData.type === "hotel" ? "チェックアウト日時" : "終了時刻"}
+                                            </Label>
                                             <Input
                                                 id="endTime"
-                                                type="time"
+                                                type={formData.type === "hotel" ? "datetime-local" : "time"}
                                                 value={formData.endTime}
                                                 onChange={(e) => setFormData({ ...formData, endTime: e.target.value })}
                                             />
+                                        </div>
+                                    </div>
+
+                                    <div className="space-y-4">
+                                        <div className="space-y-2">
+                                            <Label className="text-xs text-muted-foreground">{formData.type === "hotel" ? "チェックイン タイムゾーン" : "開始タイムゾーン"}</Label>
+                                            <Select value={formData.startTimezone} onValueChange={(v) => setFormData({ ...formData, startTimezone: v, endTimezone: formData.type === "hotel" ? formData.endTimezone : v })}>
+                                                <SelectTrigger className="text-xs h-8">
+                                                    <SelectValue />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    {TIMEZONES.map((tz) => (
+                                                        <SelectItem key={tz.value} value={tz.value} className="text-xs">
+                                                            {tz.label}
+                                                        </SelectItem>
+                                                    ))}
+                                                </SelectContent>
+                                            </Select>
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label className="text-xs text-muted-foreground">{formData.type === "hotel" ? "チェックアウト タイムゾーン" : "終了タイムゾーン"}</Label>
+                                            <Select value={formData.endTimezone} onValueChange={(v) => setFormData({ ...formData, endTimezone: v })}>
+                                                <SelectTrigger className="text-xs h-8">
+                                                    <SelectValue />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    {TIMEZONES.map((tz) => (
+                                                        <SelectItem key={tz.value} value={tz.value} className="text-xs">
+                                                            {tz.label}
+                                                        </SelectItem>
+                                                    ))}
+                                                </SelectContent>
+                                            </Select>
                                         </div>
                                     </div>
                                 </>
@@ -674,132 +859,226 @@ export function ItineraryTab({ tripId, items, members, currentMemberId, tripStar
                 </Card>
             ) : (
                 <div className="space-y-8 relative before:absolute before:inset-0 before:left-4 before:h-full before:w-0.5 before:bg-muted before:z-0">
-                    {sortedDates.map((date) => (
-                        <div key={date} className="relative z-10">
-                            <div className="flex items-center gap-4 mb-4">
-                                <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center text-white shrink-0 z-20 shadow-md">
-                                    <Clock className="h-4 w-4" />
+                    {sortedDates.map((date) => {
+                        // Helper for formatting times
+                        const formatLocalTime = (isoString: string | null, offset: string | null) => {
+                            if (!isoString) return null;
+                            if (!offset) {
+                                return new Date(isoString).toLocaleTimeString("ja-JP", { hour: "2-digit", minute: "2-digit" });
+                            }
+                            try {
+                                const date = new Date(isoString);
+                                const utcMs = date.getTime();
+                                const sign = offset.startsWith("+") ? 1 : -1;
+                                const [h, m] = offset.slice(1).split(":").map(Number);
+                                const offsetMs = sign * (h * 60 + m) * 60 * 1000;
+                                const localDate = new Date(utcMs + offsetMs);
+                                return localDate.toLocaleTimeString("ja-JP", {
+                                    hour: "2-digit",
+                                    minute: "2-digit",
+                                    timeZone: "UTC"
+                                });
+                            } catch (e) {
+                                return "";
+                            }
+                        };
+
+                        return (
+                            <div key={date} className="relative z-10">
+                                <div className="flex items-center gap-4 mb-4">
+                                    <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center text-white shrink-0 z-20 shadow-md">
+                                        <Clock className="h-4 w-4" />
+                                    </div>
+                                    <h3 className="text-lg font-bold">
+                                        {date === "未定"
+                                            ? "📅 日付未定"
+                                            : `${new Date(date).toLocaleDateString("ja-JP", {
+                                                month: "long",
+                                                day: "numeric",
+                                                weekday: "short",
+                                            })}`}
+                                    </h3>
                                 </div>
-                                <h3 className="text-lg font-bold">
-                                    {date === "未定"
-                                        ? "📅 日付未定"
-                                        : `${new Date(date).toLocaleDateString("ja-JP", {
-                                            month: "long",
-                                            day: "numeric",
-                                            weekday: "short",
-                                        })}`}
-                                </h3>
-                            </div>
-                            <div className="space-y-6 ml-10">
-                                {groupedItems[date].map((item) => {
-                                    const typeInfo = ITEM_TYPES[item.type as keyof typeof ITEM_TYPES] || ITEM_TYPES.other;
-                                    const Icon = typeInfo.icon;
+                                <div className="space-y-6 ml-10">
+                                    {/* Hotel Stay Banner - Integrated into the list flow */}
+                                    {(hotelStaysPerDate[date] || []).map(hotel => {
+                                        const isCheckIn = date === hotel.check_in_date;
+                                        const isCheckOut = date === hotel.check_out_date;
+                                        const startTime = isCheckIn ? formatLocalTime(hotel.start_time, hotel.start_timezone) : null;
+                                        const endTime = isCheckOut ? formatLocalTime(hotel.end_time, hotel.end_timezone) : null;
 
-                                    const displayTime = item.type === "flight"
-                                        ? (item.departure_time ? new Date(item.departure_time).toLocaleTimeString("ja-JP", { hour: "2-digit", minute: "2-digit" }) : null)
-                                        : (item.start_time ? new Date(item.start_time).toLocaleTimeString("ja-JP", { hour: "2-digit", minute: "2-digit" }) : null);
+                                        return (
+                                            <div key={`stay-${hotel.id}`} className="mb-4 p-3 bg-indigo-50/80 dark:bg-indigo-900/20 border border-indigo-100 dark:border-indigo-800 rounded-lg flex items-center gap-3 text-indigo-700 dark:text-indigo-300">
+                                                <div className="bg-indigo-100 dark:bg-indigo-800 p-1.5 rounded-md shrink-0">
+                                                    <Hotel className="h-4 w-4" />
+                                                </div>
+                                                <div className="min-w-0 flex-1">
+                                                    <div className="text-xs font-semibold uppercase tracking-wider opacity-70">Staying at</div>
+                                                    <div className="font-bold text-sm truncate">{hotel.title}</div>
+                                                </div>
 
-                                    const displayEndTime = item.type === "flight"
-                                        ? (item.arrival_time ? new Date(item.arrival_time).toLocaleTimeString("ja-JP", { hour: "2-digit", minute: "2-digit" }) : null)
-                                        : (item.end_time ? new Date(item.end_time).toLocaleTimeString("ja-JP", { hour: "2-digit", minute: "2-digit" }) : null);
+                                                {/* Times for Check-in/Check-out days */}
+                                                {(startTime || endTime) && (
+                                                    <div className="flex items-center gap-3 text-xs font-medium px-2 shrink-0">
+                                                        {startTime && (
+                                                            <div className="flex items-center gap-1 bg-white/50 dark:bg-black/20 px-2 py-1 rounded">
+                                                                <span className="text-indigo-500">IN</span>
+                                                                <span className="font-bold">{startTime}</span>
+                                                            </div>
+                                                        )}
+                                                        {endTime && (
+                                                            <div className="flex items-center gap-1 bg-white/50 dark:bg-black/20 px-2 py-1 rounded">
+                                                                <span className="text-indigo-500">OUT</span>
+                                                                <span className="font-bold">{endTime}</span>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                )}
 
-                                    return (
-                                        <Card key={item.id} className="relative transition-all hover:shadow-lg border-l-4 border-l-blue-500 overflow-hidden">
-                                            <CardContent className="p-0">
-                                                <div className="p-4 sm:p-5">
-                                                    <div className="flex items-start justify-between gap-2">
-                                                        <div className="flex-1 min-w-0">
-                                                            {/* Time: Visible and prominent as requested */}
-                                                            {displayTime && (
-                                                                <div className="flex items-center gap-1.5 text-blue-600 font-bold text-sm mb-2 px-2 py-0.5 bg-blue-50 dark:bg-blue-900/30 rounded-full w-fit">
-                                                                    <Clock className="h-3.5 w-3.5" />
-                                                                    <span>{displayTime}</span>
-                                                                    {displayEndTime && (
-                                                                        <>
-                                                                            <ArrowRight className="h-3 w-3 mx-0.5" />
-                                                                            <span>{displayEndTime}</span>
-                                                                        </>
+                                                <div className="shrink-0 ml-2">
+                                                    <DropdownMenu>
+                                                        <DropdownMenuTrigger asChild>
+                                                            <Button variant="ghost" size="icon" className="h-7 w-7 rounded-full hover:bg-indigo-200/50">
+                                                                <MoreHorizontal className="h-4 w-4" />
+                                                            </Button>
+                                                        </DropdownMenuTrigger>
+                                                        <DropdownMenuContent align="end">
+                                                            <DropdownMenuItem onClick={() => handleEdit(hotel)}>
+                                                                ✏️ 編集
+                                                            </DropdownMenuItem>
+                                                            <DropdownMenuItem
+                                                                className="text-red-600 focus:text-red-600"
+                                                                onClick={() => handleDelete(hotel.id)}
+                                                            >
+                                                                🗑️ 削除
+                                                            </DropdownMenuItem>
+                                                        </DropdownMenuContent>
+                                                    </DropdownMenu>
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+
+                                    {(groupedItems[date] || []).filter(item => item.type !== "hotel").map((item) => {
+                                        const typeInfo = ITEM_TYPES[item.type as keyof typeof ITEM_TYPES] || ITEM_TYPES.other;
+                                        const Icon = typeInfo.icon;
+
+
+
+                                        const displayTime = item.type === "flight"
+                                            ? formatLocalTime(item.departure_time, item.start_timezone)
+                                            : formatLocalTime(item.start_time, item.start_timezone);
+
+                                        const displayEndTime = item.type === "flight"
+                                            ? formatLocalTime(item.arrival_time, item.end_timezone)
+                                            : formatLocalTime(item.end_time, item.end_timezone);
+
+                                        return (
+                                            <Card key={item.id} className="relative transition-all hover:shadow-lg border-l-4 border-l-blue-500 overflow-hidden">
+                                                <CardContent className="p-0">
+                                                    <div className="p-4 sm:p-5">
+                                                        <div className="flex items-start justify-between gap-2">
+                                                            <div className="flex-1 min-w-0">
+                                                                {/* Time: Visible and prominent as requested */}
+                                                                {displayTime && (
+                                                                    <div className="flex items-center gap-1.5 text-blue-600 font-bold text-sm mb-2 px-2 py-0.5 bg-blue-50 dark:bg-blue-900/30 rounded-full w-fit">
+                                                                        <Clock className="h-3.5 w-3.5" />
+                                                                        <span>{displayTime}</span>
+                                                                        {displayEndTime && (
+                                                                            <>
+                                                                                <ArrowRight className="h-3 w-3 mx-0.5" />
+                                                                                <span>{displayEndTime}</span>
+                                                                            </>
+                                                                        )}
+                                                                    </div>
+                                                                )}
+
+                                                                <div className="flex items-center gap-3 mb-2">
+                                                                    <div className="w-10 h-10 rounded-xl bg-muted shrink-0 flex items-center justify-center text-2xl">
+                                                                        {typeInfo.emoji}
+                                                                    </div>
+                                                                    <div className="flex items-center gap-2 min-w-0">
+                                                                        <h4 className="text-xl font-bold truncate leading-tight">{item.title}</h4>
+                                                                        {item.is_ai_generated && (
+                                                                            <Badge variant="outline" className="bg-blue-50 text-blue-600 border-blue-200 gap-1 shrink-0 h-5 px-1.5 text-[10px]">
+                                                                                <Bot className="h-3 w-3" /> AI
+                                                                            </Badge>
+                                                                        )}
+                                                                    </div>
+                                                                </div>
+
+                                                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-y-2 mt-4 text-sm">
+                                                                    {item.location && (
+                                                                        <div className="flex items-center gap-2 text-muted-foreground mr-4">
+                                                                            <MapPin className="h-4 w-4 shrink-0 text-blue-500" />
+                                                                            <span className="truncate">{item.location}</span>
+                                                                        </div>
+                                                                    )}
+
+                                                                    {item.type === "flight" && item.flight_number && (
+                                                                        <div className="flex items-center gap-2 text-muted-foreground">
+                                                                            <Plane className="h-4 w-4 shrink-0 text-blue-500" />
+                                                                            <span>{item.airline} {item.flight_number}</span>
+                                                                        </div>
+                                                                    )}
+
+                                                                    {item.type === "hotel" && item.check_in_date && (
+                                                                        <div className="flex items-center gap-2 text-muted-foreground">
+                                                                            <Hotel className="h-4 w-4 shrink-0 text-blue-500" />
+                                                                            <span>
+                                                                                {new Date(item.check_in_date).toLocaleDateString("ja-JP")} 〜{" "}
+                                                                                {item.check_out_date && new Date(item.check_out_date).toLocaleDateString("ja-JP")}
+                                                                            </span>
+                                                                        </div>
                                                                     )}
                                                                 </div>
-                                                            )}
 
-                                                            <div className="flex items-center gap-3 mb-2">
-                                                                <div className="w-10 h-10 rounded-xl bg-muted shrink-0 flex items-center justify-center text-2xl">
-                                                                    {typeInfo.emoji}
-                                                                </div>
-                                                                <h4 className="text-xl font-bold truncate leading-tight">{item.title}</h4>
-                                                            </div>
-
-                                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-y-2 mt-4 text-sm">
-                                                                {item.location && (
-                                                                    <div className="flex items-center gap-2 text-muted-foreground mr-4">
-                                                                        <MapPin className="h-4 w-4 shrink-0 text-blue-500" />
-                                                                        <span className="truncate">{item.location}</span>
-                                                                    </div>
-                                                                )}
-
-                                                                {item.type === "flight" && item.flight_number && (
-                                                                    <div className="flex items-center gap-2 text-muted-foreground">
-                                                                        <Plane className="h-4 w-4 shrink-0 text-blue-500" />
-                                                                        <span>{item.airline} {item.flight_number}</span>
-                                                                    </div>
-                                                                )}
-
-                                                                {item.type === "hotel" && item.check_in_date && (
-                                                                    <div className="flex items-center gap-2 text-muted-foreground">
-                                                                        <Hotel className="h-4 w-4 shrink-0 text-blue-500" />
-                                                                        <span>
-                                                                            {new Date(item.check_in_date).toLocaleDateString("ja-JP")} 〜{" "}
-                                                                            {item.check_out_date && new Date(item.check_out_date).toLocaleDateString("ja-JP")}
-                                                                        </span>
+                                                                {item.notes && (
+                                                                    <div className="mt-4 p-3 rounded-lg bg-orange-50/50 dark:bg-orange-900/10 border border-orange-100 dark:border-orange-900/30 flex gap-2">
+                                                                        <Notebook className="h-4 w-4 shrink-0 text-orange-500 mt-0.5" />
+                                                                        <p className="text-sm text-orange-800 dark:text-orange-200">{item.notes}</p>
                                                                     </div>
                                                                 )}
                                                             </div>
 
-                                                            {item.notes && (
-                                                                <div className="mt-4 p-3 rounded-lg bg-orange-50/50 dark:bg-orange-900/10 border border-orange-100 dark:border-orange-900/30 flex gap-2">
-                                                                    <Notebook className="h-4 w-4 shrink-0 text-orange-500 mt-0.5" />
-                                                                    <p className="text-sm text-orange-800 dark:text-orange-200">{item.notes}</p>
-                                                                </div>
-                                                            )}
-                                                        </div>
+                                                            {/* Actions: Less noticed but available */}
+                                                            <div className="shrink-0 flex flex-col items-end gap-2">
+                                                                <DropdownMenu>
+                                                                    <DropdownMenuTrigger asChild>
+                                                                        <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full">
+                                                                            <MoreHorizontal className="h-4 w-4" />
+                                                                        </Button>
+                                                                    </DropdownMenuTrigger>
+                                                                    <DropdownMenuContent align="end">
+                                                                        <DropdownMenuItem onClick={() => handleEdit(item)}>
+                                                                            ✏️ 編集
+                                                                        </DropdownMenuItem>
+                                                                        <DropdownMenuItem
+                                                                            className="text-red-600 focus:text-red-600"
+                                                                            onClick={() => handleDelete(item.id)}
+                                                                        >
+                                                                            🗑️ 削除
+                                                                        </DropdownMenuItem>
+                                                                    </DropdownMenuContent>
+                                                                </DropdownMenu>
 
-                                                        {/* Actions: Less noticed but available */}
-                                                        <div className="shrink-0 flex flex-col items-end gap-2">
-                                                            <DropdownMenu>
-                                                                <DropdownMenuTrigger asChild>
-                                                                    <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full">
-                                                                        <MoreHorizontal className="h-4 w-4" />
-                                                                    </Button>
-                                                                </DropdownMenuTrigger>
-                                                                <DropdownMenuContent align="end">
-                                                                    <DropdownMenuItem onClick={() => handleEdit(item)}>
-                                                                        ✏️ 編集
-                                                                    </DropdownMenuItem>
-                                                                    <DropdownMenuItem
-                                                                        className="text-red-600 focus:text-red-600"
-                                                                        onClick={() => handleDelete(item.id)}
-                                                                    >
-                                                                        🗑️ 削除
-                                                                    </DropdownMenuItem>
-                                                                </DropdownMenuContent>
-                                                            </DropdownMenu>
-
-                                                            <Badge variant="secondary" className="text-[10px] uppercase font-bold tracking-wider rounded-lg px-2">
-                                                                {typeInfo.label}
-                                                            </Badge>
+                                                                <Badge variant="secondary" className="text-[10px] uppercase font-bold tracking-wider rounded-lg px-2">
+                                                                    {typeInfo.label}
+                                                                </Badge>
+                                                            </div>
                                                         </div>
                                                     </div>
-                                                </div>
-                                            </CardContent>
-                                        </Card>
-                                    );
-                                })}
+                                                </CardContent>
+                                            </Card>
+                                        );
+                                    })}
+                                </div>
                             </div>
-                        </div>
-                    ))}
+                        );
+                    })}
                 </div>
-            )}
+            )
+            }
         </div>
     );
 }
