@@ -18,17 +18,22 @@ type ItineraryItem = Database["public"]["Tables"]["itinerary_items"]["Row"];
 interface ItineraryTabProps {
     tripId: string;
     items: ItineraryItem[];
+    members: {
+        user_id: string;
+        profiles: { display_name: string } | null;
+    }[];
+    currentUserId: string;
 }
 
 const ITEM_TYPES = {
-    flight: { label: "フライト", emoji: "✈️" },
-    hotel: { label: "ホテル", emoji: "🏨" },
-    activity: { label: "アクティビティ", emoji: "🎯" },
-    restaurant: { label: "レストラン", emoji: "🍽️" },
-    other: { label: "その他", emoji: "📌" },
+    flight: { label: "フライト", emoji: "✈️", category: "transport" },
+    hotel: { label: "ホテル", emoji: "🏨", category: "accommodation" },
+    activity: { label: "アクティビティ", emoji: "🎯", category: "activity" },
+    restaurant: { label: "レストラン", emoji: "🍽️", category: "food" },
+    other: { label: "その他", emoji: "📌", category: "other" },
 };
 
-export function ItineraryTab({ tripId, items }: ItineraryTabProps) {
+export function ItineraryTab({ tripId, items, members, currentUserId }: ItineraryTabProps) {
     const [dialogOpen, setDialogOpen] = useState(false);
     const [loading, setLoading] = useState(false);
     const [formData, setFormData] = useState({
@@ -39,6 +44,8 @@ export function ItineraryTab({ tripId, items }: ItineraryTabProps) {
         endTime: "",
         location: "",
         notes: "",
+        // Price for auto-expense
+        price: "",
         // Flight specific
         airline: "",
         flightNumber: "",
@@ -92,6 +99,34 @@ export function ItineraryTab({ tripId, items }: ItineraryTabProps) {
         if (error) {
             toast.error("追加に失敗しました", { description: error.message });
         } else {
+            // 金額が入力されていたら費用も自動登録
+            if (formData.price && Number(formData.price) > 0 && user) {
+                const typeInfo = ITEM_TYPES[formData.type as keyof typeof ITEM_TYPES];
+                const { data: expense, error: expenseError } = await supabase
+                    .from("expenses")
+                    .insert({
+                        trip_id: tripId,
+                        amount: Number(formData.price),
+                        currency: "JPY",
+                        amount_jpy: Number(formData.price),
+                        category: typeInfo.category,
+                        description: formData.title,
+                        paid_by: currentUserId,
+                        date: formData.date || formData.checkInDate || formData.departureTime?.split("T")[0] || null,
+                    })
+                    .select()
+                    .single();
+
+                if (!expenseError && expense) {
+                    // 全メンバーを対象者として登録
+                    const splits = members.map((m) => ({
+                        expense_id: expense.id,
+                        user_id: m.user_id,
+                    }));
+                    await supabase.from("expense_splits").insert(splits);
+                }
+            }
+
             toast.success("旅程を追加しました");
             setDialogOpen(false);
             setFormData({
@@ -102,6 +137,7 @@ export function ItineraryTab({ tripId, items }: ItineraryTabProps) {
                 endTime: "",
                 location: "",
                 notes: "",
+                price: "",
                 airline: "",
                 flightNumber: "",
                 departureAirport: "",
@@ -324,6 +360,17 @@ export function ItineraryTab({ tripId, items }: ItineraryTabProps) {
                                     value={formData.notes}
                                     onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
                                     placeholder="備考など"
+                                />
+                            </div>
+
+                            <div className="space-y-2">
+                                <Label htmlFor="price">金額（円）- 費用に自動登録</Label>
+                                <Input
+                                    id="price"
+                                    type="number"
+                                    value={formData.price}
+                                    onChange={(e) => setFormData({ ...formData, price: e.target.value })}
+                                    placeholder="入力すると費用タブにも登録されます"
                                 />
                             </div>
 

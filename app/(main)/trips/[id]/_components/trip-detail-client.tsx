@@ -120,7 +120,12 @@ export function TripDetailClient({
                     </TabsList>
 
                     <TabsContent value="itinerary" className="px-4 py-4">
-                        <ItineraryTab tripId={trip.id} items={itineraryItems} />
+                        <ItineraryTab
+                            tripId={trip.id}
+                            items={itineraryItems}
+                            members={members}
+                            currentUserId={currentUserId}
+                        />
                     </TabsContent>
 
                     <TabsContent value="places" className="px-4 py-4">
