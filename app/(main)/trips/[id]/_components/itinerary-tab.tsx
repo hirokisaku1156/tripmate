@@ -52,12 +52,12 @@ export function ItineraryTab({ tripId, items, members, currentUserId, tripStartD
         flightNumber: "",
         departureAirport: "",
         arrivalAirport: "",
-        departureTime: "",
+        departureTime: tripStartDate ? `${tripStartDate}T10:00` : "",
         arrivalTime: "",
         confirmationNumber: "",
         // Hotel specific
-        checkInDate: "",
-        checkOutDate: "",
+        checkInDate: tripStartDate ?? "",
+        nights: "1",
     });
     const router = useRouter();
     const supabase = createClient();
@@ -92,7 +92,11 @@ export function ItineraryTab({ tripId, items, members, currentUserId, tripStartD
 
         if (formData.type === "hotel") {
             insertData.check_in_date = formData.checkInDate || null;
-            insertData.check_out_date = formData.checkOutDate || null;
+            if (formData.checkInDate && formData.nights) {
+                const checkIn = new Date(formData.checkInDate);
+                checkIn.setDate(checkIn.getDate() + Number(formData.nights));
+                insertData.check_out_date = checkIn.toISOString().split('T')[0];
+            }
         }
 
         const { error } = await supabase.from("itinerary_items").insert(insertData);
@@ -147,7 +151,7 @@ export function ItineraryTab({ tripId, items, members, currentUserId, tripStartD
                 arrivalTime: "",
                 confirmationNumber: "",
                 checkInDate: "",
-                checkOutDate: "",
+                nights: "1",
             });
             router.refresh();
         }
@@ -298,13 +302,22 @@ export function ItineraryTab({ tripId, items, members, currentUserId, tripStartD
                                         />
                                     </div>
                                     <div className="space-y-2">
-                                        <Label htmlFor="checkOutDate">チェックアウト</Label>
-                                        <Input
-                                            id="checkOutDate"
-                                            type="date"
-                                            value={formData.checkOutDate}
-                                            onChange={(e) => setFormData({ ...formData, checkOutDate: e.target.value })}
-                                        />
+                                        <Label htmlFor="nights">宿泊数</Label>
+                                        <Select
+                                            value={formData.nights}
+                                            onValueChange={(v) => setFormData({ ...formData, nights: v })}
+                                        >
+                                            <SelectTrigger>
+                                                <SelectValue />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 14, 30].map((n) => (
+                                                    <SelectItem key={n} value={n.toString()}>
+                                                        {n}泊
+                                                    </SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
                                     </div>
                                 </div>
                             )}
