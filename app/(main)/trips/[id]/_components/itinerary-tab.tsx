@@ -30,6 +30,7 @@ import {
     DropdownMenuItem,
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { analyzeFlightScreenshot } from "@/app/actions/analyze-flight";
 import type { Database } from "@/lib/supabase/types";
 
 type ItineraryItem = Database["public"]["Tables"]["itinerary_items"]["Row"];
@@ -58,6 +59,7 @@ const ITEM_TYPES = {
 export function ItineraryTab({ tripId, items, members, currentMemberId, tripStartDate }: ItineraryTabProps) {
     const [dialogOpen, setDialogOpen] = useState(false);
     const [loading, setLoading] = useState(false);
+    const [analysisLoading, setAnalysisLoading] = useState(false);
     const [editItemId, setEditItemId] = useState<string | null>(null);
     const [formData, setFormData] = useState({
         type: "",
@@ -247,6 +249,44 @@ export function ItineraryTab({ tripId, items, members, currentMemberId, tripStar
         setLoading(false);
     };
 
+    const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        setAnalysisLoading(true);
+        const reader = new FileReader();
+        reader.onload = async (event) => {
+            try {
+                const base64 = event.target?.result as string;
+                const result = await analyzeFlightScreenshot(base64);
+
+                setFormData(prev => ({
+                    ...prev,
+                    type: "flight",
+                    title: result.title || "フライト",
+                    airline: result.airline || "",
+                    flightNumber: result.flightNumber || "",
+                    departureAirport: result.departureAirport || "",
+                    arrivalAirport: result.arrivalAirport || "",
+                    departureTime: result.departureTime || "",
+                    arrivalTime: result.arrivalTime || "",
+                    confirmationNumber: result.confirmationNumber || "",
+                    date: result.departureTime ? result.departureTime.split("T")[0] : prev.date,
+                }));
+                // 既にダイアログは開いているはずだが念のため
+                setDialogOpen(true);
+                toast.success("スクショを解析しました！内容を確認してください。");
+            } catch (error) {
+                toast.error("情報の解析に失敗しました");
+            } finally {
+                setAnalysisLoading(false);
+                // Reset input
+                e.target.value = "";
+            }
+        };
+        reader.readAsDataURL(file);
+    };
+
     // 日付でグループ化
     const groupedItems = items.reduce((acc, item) => {
         const date = item.date || "未定";
@@ -348,6 +388,31 @@ export function ItineraryTab({ tripId, items, members, currentMemberId, tripStar
                             {/* Flight specific fields */}
                             {formData.type === "flight" && (
                                 <>
+                                    <div className="p-3 border rounded-lg bg-blue-50/50 dark:bg-blue-900/10 border-blue-200 dark:border-blue-800 space-y-2">
+                                        <p className="text-[11px] text-blue-700 dark:text-blue-300 font-medium flex items-center gap-1">
+                                            <span>✨</span> 便名をスクショから自動入力する
+                                        </p>
+                                        <input
+                                            type="file"
+                                            id="flight-upload-dialog"
+                                            className="hidden"
+                                            accept="image/*"
+                                            onChange={handleFileChange}
+                                            disabled={analysisLoading}
+                                        />
+                                        <Button
+                                            type="button"
+                                            variant="outline"
+                                            size="sm"
+                                            asChild
+                                            disabled={analysisLoading}
+                                            className="w-full bg-white dark:bg-gray-900 border-blue-200 text-blue-600 hover:bg-blue-50"
+                                        >
+                                            <label htmlFor="flight-upload-dialog" className="cursor-pointer">
+                                                {analysisLoading ? "⏳ 解析中..." : "✈️ 予約スクショを読み込む"}
+                                            </label>
+                                        </Button>
+                                    </div>
                                     <div className="grid grid-cols-2 gap-4">
                                         <div className="space-y-2">
                                             <Label htmlFor="airline">航空会社</Label>

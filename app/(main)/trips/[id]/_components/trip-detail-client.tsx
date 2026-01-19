@@ -8,6 +8,7 @@ import { ItineraryTab } from "./itinerary-tab";
 import { PlacesTab } from "./places-tab";
 import { MembersTab } from "./members-tab";
 import { ExpensesTab } from "./expenses-tab";
+import { ChatTab } from "./chat-tab";
 import type { Database } from "@/lib/supabase/types";
 
 type Trip = Database["public"]["Tables"]["trips"]["Row"];
@@ -26,6 +27,7 @@ interface TripDetailClientProps {
     places: Place[];
     expenses: Expense[];
     expenseSplits: ExpenseSplit[];
+    chatMessages: any[];
     currentUserId: string;
     isOwner: boolean;
 }
@@ -37,6 +39,7 @@ export function TripDetailClient({
     places,
     expenses,
     expenseSplits,
+    chatMessages,
     currentUserId,
     isOwner,
 }: TripDetailClientProps) {
@@ -130,6 +133,12 @@ export function TripDetailClient({
                         >
                             💰 費用
                         </TabsTrigger>
+                        <TabsTrigger
+                            value="chat"
+                            className="rounded-none border-b-2 border-transparent data-[state=active]:border-blue-500 data-[state=active]:bg-transparent px-4 py-3"
+                        >
+                            🤖 AI
+                        </TabsTrigger>
                     </TabsList>
 
                     <TabsContent value="itinerary" className="px-4 py-4">
@@ -173,6 +182,22 @@ export function TripDetailClient({
                                 profiles: m.profiles
                             }))}
                             currentMemberId={currentMemberId}
+                        />
+                    </TabsContent>
+
+                    <TabsContent value="chat" className="px-4 py-4">
+                        <ChatTab
+                            tripId={trip.id}
+                            initialMessages={chatMessages}
+                            context={{
+                                tripName: trip.name,
+                                destinations: trip.destinations,
+                                startDate: trip.start_date,
+                                endDate: trip.end_date,
+                                memberCount: members.length,
+                                itineraryItems: itineraryItems,
+                                places: places
+                            }}
                         />
                     </TabsContent>
                 </Tabs>

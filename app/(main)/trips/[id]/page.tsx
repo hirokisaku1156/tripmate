@@ -60,7 +60,7 @@ export default async function TripDetailPage({ params }: TripDetailPageProps) {
     const expenseIds = (expenses ?? []).map(e => e.id);
 
     // 残りのデータを取得
-    const [membersResult, itineraryResult, placesResult, expenseSplitsResult] = await Promise.all([
+    const [membersResult, itineraryResult, placesResult, chatMessagesResult, expenseSplitsResult] = await Promise.all([
         supabase
             .from("trip_members")
             .select(`
@@ -82,6 +82,11 @@ export default async function TripDetailPage({ params }: TripDetailPageProps) {
             .select("*")
             .eq("trip_id", id)
             .order("created_at", { ascending: false }),
+        supabase
+            .from("chat_messages")
+            .select("*")
+            .eq("trip_id", id)
+            .order("created_at", { ascending: true }),
         expenseIds.length > 0
             ? supabase
                 .from("expense_splits")
@@ -110,6 +115,7 @@ export default async function TripDetailPage({ params }: TripDetailPageProps) {
             places={placesResult.data ?? []}
             expenses={expenses ?? []}
             expenseSplits={filteredSplits}
+            chatMessages={chatMessagesResult.data ?? []}
             currentUserId={user.id}
             isOwner={member.role === "owner"}
         />
