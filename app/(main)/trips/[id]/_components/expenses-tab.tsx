@@ -99,6 +99,7 @@ export function ExpensesTab({
         members.map((m) => m.id)
     );
     const [showSettled, setShowSettled] = useState(true);
+    const [selectedCategory, setSelectedCategory] = useState<string>("all");
     const [exchangeRates, setExchangeRates] = useState<Record<string, number>>({});
     const [ratesLoading, setRatesLoading] = useState(false);
     const router = useRouter();
@@ -587,19 +588,40 @@ export function ExpensesTab({
                         {showSettled ? "📑 精算済を隠す" : "📑 精算済を表示"}
                     </Button>
                 </div>
+
+                {/* カテゴリフィルター */}
+                <div className="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar">
+                    <Badge
+                        variant={selectedCategory === "all" ? "default" : "outline"}
+                        className="cursor-pointer shrink-0"
+                        onClick={() => setSelectedCategory("all")}
+                    >
+                        すべて
+                    </Badge>
+                    {CATEGORIES.map((cat) => (
+                        <Badge
+                            key={cat.value}
+                            variant={selectedCategory === cat.value ? "default" : "outline"}
+                            className="cursor-pointer shrink-0"
+                            onClick={() => setSelectedCategory(cat.value)}
+                        >
+                            {cat.icon} {cat.label}
+                        </Badge>
+                    ))}
+                </div>
             </div>
 
             {/* 支払い一覧 */}
-            {expenses.filter(e => showSettled || !e.is_settled).length === 0 ? (
+            {expenses.filter(e => (showSettled || !e.is_settled) && (selectedCategory === "all" || e.category === selectedCategory)).length === 0 ? (
                 <Card className="border-dashed">
                     <CardContent className="py-8 text-center text-muted-foreground">
-                        {expenses.length === 0 ? "支払いがありません" : "表示できる支払いがありません"}
+                        {expenses.length === 0 ? "支払いがありません" : "条件に一致する支払いがありません"}
                     </CardContent>
                 </Card>
             ) : (
                 <div className="space-y-2">
                     {expenses
-                        .filter(e => showSettled || !e.is_settled)
+                        .filter(e => (showSettled || !e.is_settled) && (selectedCategory === "all" || e.category === selectedCategory))
                         .map((expense) => {
                             const cat = getCategoryInfo(expense.category);
                             const splits = expenseSplits.filter(
@@ -689,7 +711,8 @@ export function ExpensesTab({
                             );
                         })}
                 </div >
-            )}
+            )
+            }
         </div >
     );
 }
