@@ -38,8 +38,9 @@ export function calculateBalances(
         const splitCount = expense.splits.length;
         if (splitCount === 0) return;
 
+        // 各メンバーに配分（端数を1円ずつ分配して公平にする）
         const perPerson = Math.floor(expense.amount / splitCount);
-        const remainder = expense.amount - (perPerson * splitCount);
+        const remainder = expense.amount % splitCount;
 
         // 払った人はプラス（受け取るべき）
         const payerBalance = balanceMap.get(expense.paid_by) ?? 0;
@@ -48,8 +49,8 @@ export function calculateBalances(
         // 対象者はマイナス（払うべき）
         expense.splits.forEach((userId, index) => {
             const balance = balanceMap.get(userId) ?? 0;
-            // 最後の1人に端数を寄せる
-            const amountToSubtract = index === splitCount - 1 ? perPerson + remainder : perPerson;
+            // 最初の remainder 人に対して 1円多く配分する
+            const amountToSubtract = index < remainder ? perPerson + 1 : perPerson;
             balanceMap.set(userId, balance - amountToSubtract);
         });
     });
