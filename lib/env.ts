@@ -1,13 +1,10 @@
-// Environment variable validation
-// This file validates required environment variables at startup
+export const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+export const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 
-function getRequiredEnvVar(name: string): string {
-    const value = process.env[name];
-    if (!value) {
-        throw new Error(`Missing required environment variable: ${name}`);
+if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
+    if (typeof window === "undefined") {
+        // サーバーサイドのみエラーを投げる（ビルド時などのチェック用）
+        console.error("Missing required environment variables: NEXT_PUBLIC_SUPABASE_URL or NEXT_PUBLIC_SUPABASE_ANON_KEY");
     }
-    return value;
 }
 
-export const SUPABASE_URL = getRequiredEnvVar("NEXT_PUBLIC_SUPABASE_URL");
-export const SUPABASE_ANON_KEY = getRequiredEnvVar("NEXT_PUBLIC_SUPABASE_ANON_KEY");

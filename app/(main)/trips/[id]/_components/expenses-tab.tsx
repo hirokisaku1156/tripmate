@@ -32,6 +32,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { SettlementDialog } from "./settlement-dialog";
 import { validateLength, validateAmount, MAX_LENGTHS } from "@/lib/validation";
+import { CURRENCIES, fetchExchangeRates, convertToJPY, formatCurrency, type CurrencyCode } from "@/lib/currency";
 
 interface ExpensesTabProps {
     tripId: string;
@@ -40,6 +41,7 @@ interface ExpensesTabProps {
         title: string | null;
         amount: number;
         currency: string;
+        amount_jpy: number | null;
         category: string | null;
         description: string | null;
         paid_by: string | null;
@@ -87,6 +89,7 @@ export function ExpensesTab({
     const [formData, setFormData] = useState({
         title: "",
         amount: "",
+        currency: "JPY" as CurrencyCode,
         category: "food",
         description: "",
         paidBy: currentMemberId,
@@ -96,8 +99,34 @@ export function ExpensesTab({
         members.map((m) => m.id)
     );
     const [showSettled, setShowSettled] = useState(true);
+    const [exchangeRates, setExchangeRates] = useState<Record<string, number>>({});
+    const [ratesLoading, setRatesLoading] = useState(false);
     const router = useRouter();
     const supabase = createClient();
+
+    // Fetch exchange rates on mount
+    const loadExchangeRates = async () => {
+        setRatesLoading(true);
+        try {
+            const rates = await fetchExchangeRates("JPY");
+            setExchangeRates(rates);
+        } catch {
+            toast.error("為替レートの取得に失敗しました");
+        } finally {
+            setRatesLoading(false);
+        }
+    };
+
+    // Calculate JPY amount
+    const calculateJPYAmount = (): number | null => {
+        const amount = Number(formData.amount);
+        if (isNaN(amount) || amount <= 0) return null;
+        if (formData.currency === "JPY") return Math.round(amount);
+        if (!exchangeRates[formData.currency]) return null;
+        return convertToJPY(amount, formData.currency, exchangeRates);
+    };
+
+    const jpyAmount = calculateJPYAmount();
 
     const handleEdit = (expense: any) => {
         const splits = expenseSplits
@@ -107,6 +136,7 @@ export function ExpensesTab({
         setFormData({
             title: expense.title || "",
             amount: expense.amount.toString(),
+            currency: (expense.currency || "JPY") as CurrencyCode,
             category: expense.category || "food",
             description: expense.description || "",
             paidBy: expense.paid_by || "",
@@ -171,17 +201,29 @@ export function ExpensesTab({
 
         setLoading(true);
 
+        // Calculate JPY amount if not JPY
+        const finalJpyAmount = formData.currency === "JPY"
+            ? Number(formData.amount)
+            : jpyAmount || Number(formData.amount);
+
+        // Get exchange rate if available
+        const rate = formData.currency !== "JPY" && exchangeRates[formData.currency]
+            ? 1 / exchangeRates[formData.currency]
+            : null;
+
         const expenseData = {
             trip_id: tripId,
             title: formData.title || null,
             amount: Number(formData.amount),
-            currency: "JPY",
-            amount_jpy: Number(formData.amount),
+            currency: formData.currency,
+            amount_jpy: finalJpyAmount,
+            exchange_rate: rate,
             category: formData.category,
             description: formData.description || null,
             paid_by: formData.paidBy,
             date: formData.date || null,
         };
+
 
         const { data: expense, error } = editExpenseId
             ? await supabase.from("expenses").update(expenseData).eq("id", editExpenseId).select().single()
@@ -216,6 +258,7 @@ export function ExpensesTab({
         setFormData({
             title: "",
             amount: "",
+            currency: "JPY",
             category: "food",
             description: "",
             paidBy: currentMemberId,
@@ -313,6 +356,7 @@ export function ExpensesTab({
                             setFormData({
                                 title: "",
                                 amount: "",
+                                currency: "JPY",
                                 category: "food",
                                 description: "",
                                 paidBy: currentMemberId,
@@ -327,6 +371,7 @@ export function ExpensesTab({
                                 setFormData({
                                     title: "",
                                     amount: "",
+                                    currency: "JPY",
                                     category: "food",
                                     description: "",
                                     paidBy: currentMemberId,
@@ -353,16 +398,61 @@ export function ExpensesTab({
                                     />
                                 </div>
                                 <div className="space-y-2">
-                                    <Label>金額（円）</Label>
-                                    <Input
-                                        type="number"
-                                        placeholder="1000"
-                                        value={formData.amount}
-                                        onChange={(e) =>
-                                            setFormData({ ...formData, amount: e.target.value })
-                                        }
-                                    />
+                                    <Label>金額</Label>
+                                    <div className="flex gap-2">
+                                        <Select
+                                            value={formData.currency}
+                                            onValueChange={(v) => {
+                                                setFormData({ ...formData, currency: v as CurrencyCode });
+                                                if (v !== "JPY" && Object.keys(exchangeRates).length === 0) {
+                                                    loadExchangeRates();
+                                                }
+                                            }}
+                                        >
+                                            <SelectTrigger className="w-24">
+                                                <SelectValue />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                {CURRENCIES.map((curr) => (
+                                                    <SelectItem key={curr.code} value={curr.code}>
+                                                        {curr.code}
+                                                    </SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
+                                        <Input
+                                            type="number"
+                                            placeholder="1000"
+                                            value={formData.amount}
+                                            onChange={(e) =>
+                                                setFormData({ ...formData, amount: e.target.value })
+                                            }
+                                            className="flex-1"
+                                        />
+                                    </div>
+                                    {formData.currency !== "JPY" && (
+                                        <div className="flex items-center gap-2 text-sm">
+                                            {ratesLoading ? (
+                                                <span className="text-muted-foreground">レート取得中...</span>
+                                            ) : jpyAmount ? (
+                                                <span className="text-green-600 font-medium">
+                                                    ≈ ¥{jpyAmount.toLocaleString()}
+                                                </span>
+                                            ) : (
+                                                <Button
+                                                    type="button"
+                                                    variant="outline"
+                                                    size="sm"
+                                                    onClick={loadExchangeRates}
+                                                    disabled={ratesLoading}
+                                                >
+                                                    レート取得
+                                                </Button>
+                                            )}
+                                        </div>
+                                    )}
                                 </div>
+
 
                                 <div className="space-y-2">
                                     <Label>カテゴリ</Label>
@@ -538,43 +628,47 @@ export function ExpensesTab({
                                                     </p>
                                                 </div>
                                             </div>
-                                            <div className="flex flex-col items-end gap-2">
-                                                <div className="flex items-center gap-2">
-                                                    <p className="font-bold">
-                                                        ¥{expense.amount.toLocaleString()}
-                                                    </p>
-                                                    <DropdownMenu>
-                                                        <DropdownMenuTrigger asChild>
-                                                            <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full">
-                                                                <MoreHorizontal className="h-4 w-4" />
-                                                            </Button>
-                                                        </DropdownMenuTrigger>
-                                                        <DropdownMenuContent align="end">
-                                                            <DropdownMenuItem onClick={() => handleEdit(expense)}>
-                                                                ✏️ 編集
-                                                            </DropdownMenuItem>
-                                                            <DropdownMenuItem
-                                                                className="text-red-600 focus:text-red-600"
-                                                                onClick={() => handleDelete(expense.id)}
-                                                            >
-                                                                🗑️ 削除
-                                                            </DropdownMenuItem>
-                                                        </DropdownMenuContent>
-                                                    </DropdownMenu>
-                                                </div>
-                                                {expense.date && (
-                                                    <p className="text-xs text-muted-foreground mt-1">
-                                                        {new Date(expense.date).toLocaleDateString("ja-JP")}
+                                            <div className="flex flex-col items-end gap-1">
+                                                <p className="font-bold">
+                                                    {formatCurrency(expense.amount, expense.currency as CurrencyCode)}
+                                                </p>
+                                                {expense.currency !== "JPY" && expense.amount_jpy && (
+                                                    <p className="text-[10px] text-muted-foreground whitespace-nowrap">
+                                                        ≈ ¥{Math.round(expense.amount_jpy).toLocaleString()}
                                                     </p>
                                                 )}
                                             </div>
+
+                                            <DropdownMenu>
+                                                <DropdownMenuTrigger asChild>
+                                                    <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full">
+                                                        <MoreHorizontal className="h-4 w-4" />
+                                                    </Button>
+                                                </DropdownMenuTrigger>
+                                                <DropdownMenuContent align="end">
+                                                    <DropdownMenuItem onClick={() => handleEdit(expense)}>
+                                                        ✏️ 編集
+                                                    </DropdownMenuItem>
+                                                    <DropdownMenuItem
+                                                        className="text-red-600 focus:text-red-600"
+                                                        onClick={() => handleDelete(expense.id)}
+                                                    >
+                                                        🗑️ 削除
+                                                    </DropdownMenuItem>
+                                                </DropdownMenuContent>
+                                            </DropdownMenu>
                                         </div>
+                                        {expense.date && (
+                                            <p className="text-xs text-muted-foreground mt-1">
+                                                {new Date(expense.date).toLocaleDateString("ja-JP")}
+                                            </p>
+                                        )}
                                     </CardContent>
                                 </Card>
                             );
                         })}
-                </div>
+                </div >
             )}
-        </div>
+        </div >
     );
 }
