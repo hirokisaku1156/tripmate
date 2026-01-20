@@ -40,7 +40,8 @@ export function validateLength(
  */
 export function validateAmount(
     value: number,
-    fieldName: string = "金額"
+    fieldName: string = "金額",
+    currency: string = "JPY"
 ): { valid: boolean; error?: string } {
     if (isNaN(value) || value < 0) {
         return {
@@ -54,13 +55,24 @@ export function validateAmount(
             error: `${fieldName}は${MAX_LENGTHS.EXPENSE_AMOUNT.toLocaleString()}円以内で入力してください`,
         };
     }
-    // 整数に丸める（円単位）
-    if (!Number.isInteger(value)) {
+
+    // 通貨に応じたバリデーション
+    const isIntegerCurrency = ["JPY", "KRW", "VND"].includes(currency);
+    if (isIntegerCurrency && !Number.isInteger(value)) {
         return {
             valid: false,
             error: `${fieldName}は整数で入力してください`,
         };
     }
+
+    // 小数制限（最大2桁）
+    if (!isIntegerCurrency && !Number.isInteger(value * 100)) {
+        return {
+            valid: false,
+            error: `${fieldName}は小数点第2位までで入力してください`,
+        };
+    }
+
     return { valid: true };
 }
 

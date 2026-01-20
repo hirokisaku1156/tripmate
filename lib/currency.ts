@@ -1,3 +1,5 @@
+import { toast } from "sonner";
+
 /**
  * Currency and Exchange Rate utilities
  */
@@ -20,13 +22,35 @@ export const CURRENCIES = [
 
 export type CurrencyCode = typeof CURRENCIES[number]["code"];
 
+const CACHE_KEY = "tripmate_exchange_rates";
+const CACHE_TTL = 60 * 60 * 1000; // 1 hour in ms
+
+interface CachedRates {
+    timestamp: number;
+    rates: Record<string, number>;
+}
+
 /**
- * Fetch exchange rates from free API
- * Uses exchangerate-api.com free tier (no API key required)
+ * Fetch exchange rates from free API with caching
  */
 export async function fetchExchangeRates(baseCurrency: CurrencyCode = "JPY"): Promise<Record<string, number>> {
+    // Try to load from cache
+    if (typeof window !== "undefined") {
+        try {
+            const cached = localStorage.getItem(`${CACHE_KEY}_${baseCurrency}`);
+            if (cached) {
+                const { timestamp, rates }: CachedRates = JSON.parse(cached);
+                if (Date.now() - timestamp < CACHE_TTL) {
+                    console.log(`Using cached rates for ${baseCurrency}`);
+                    return rates;
+                }
+            }
+        } catch (e) {
+            console.warn("Failed to read exchange rate cache", e);
+        }
+    }
+
     try {
-        // Using free API from exchangerate-api.com
         const response = await fetch(
             `https://api.exchangerate-api.com/v4/latest/${baseCurrency}`
         );
@@ -36,9 +60,35 @@ export async function fetchExchangeRates(baseCurrency: CurrencyCode = "JPY"): Pr
         }
 
         const data = await response.json();
-        return data.rates;
+        const rates = data.rates;
+
+        // Save to cache
+        if (typeof window !== "undefined") {
+            try {
+                const cacheData: CachedRates = {
+                    timestamp: Date.now(),
+                    rates,
+                };
+                localStorage.setItem(`${CACHE_KEY}_${baseCurrency}`, JSON.stringify(cacheData));
+            } catch (e) {
+                console.warn("Failed to save exchange rate cache", e);
+            }
+        }
+
+        return rates;
     } catch (error) {
         console.error("Exchange rate fetch error:", error);
+
+        // Fallback to cache even if expired if we're offline or API fails
+        if (typeof window !== "undefined") {
+            const cached = localStorage.getItem(`${CACHE_KEY}_${baseCurrency}`);
+            if (cached) {
+                const { rates }: CachedRates = JSON.parse(cached);
+                toast.warning("最新レートの取得に失敗したため、キャッシュを使用します");
+                return rates;
+            }
+        }
+
         throw error;
     }
 }

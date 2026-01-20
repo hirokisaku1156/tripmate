@@ -184,7 +184,7 @@ export function ExpensesTab({
             toast.error("金額を入力してください");
             return;
         }
-        const amountValidation = validateAmount(amount, "金額");
+        const amountValidation = validateAmount(amount, "金額", formData.currency);
         if (!amountValidation.valid) {
             toast.error(amountValidation.error);
             return;
@@ -207,6 +207,13 @@ export function ExpensesTab({
         setLoading(true);
 
         // Calculate JPY amount if not JPY
+        // Check for rate failure if non-JPY
+        if (formData.currency !== "JPY" && !jpyAmount) {
+            if (!confirm("為替レートの取得に失敗しています。このまま保存すると1対1（元の金額＝日本円）として計算されますが、よろしいですか？")) {
+                return;
+            }
+        }
+
         const finalJpyAmount = formData.currency === "JPY"
             ? Number(formData.amount)
             : jpyAmount || Number(formData.amount);
