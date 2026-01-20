@@ -320,13 +320,13 @@ export function ExpensesTab({
     // 未精算の合計金額
     const totalUnsettledAmount = expenses
         .filter(e => !e.is_settled)
-        .reduce((sum, e) => sum + e.amount, 0);
+        .reduce((sum, e) => sum + (e.amount_jpy || e.amount), 0);
 
     // 精算用データを準備（未精算のみ）
     const unsettledExpenseData = expenses
         .filter(e => !e.is_settled)
         .map((e) => ({
-            amount: e.amount,
+            amount: e.amount_jpy || e.amount,
             paid_by: e.paid_by ?? "",
             splits: expenseSplits
                 .filter((s) => s.expense_id === e.id)
