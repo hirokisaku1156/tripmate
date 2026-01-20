@@ -265,8 +265,61 @@ ${JSON.stringify(context.places, null, 2)}
 
         if (call && call.functionCall) {
             const { name, args } = call.functionCall;
-            const toolArgs = args as any;
-            console.log(`AI Calling Tool: ${name}`, toolArgs);
+
+            // Tool arguments interface and validation
+            interface ToolArgs {
+                id?: string;
+                title?: string;
+                date?: string;
+                startTime?: string;
+                endTime?: string;
+                startTimezone?: string;
+                endTimezone?: string;
+                location?: string;
+                description?: string;
+                type?: string;
+                price?: number;
+                amount?: number;
+                category?: string;
+                name?: string;
+                address?: string;
+            }
+
+            const toolArgs: ToolArgs = (args || {}) as ToolArgs;
+
+            // Basic validation for common fields
+            const validateString = (val: unknown, maxLen: number): string | undefined => {
+                if (val === undefined || val === null) return undefined;
+                const str = String(val).trim();
+                return str.length > maxLen ? str.substring(0, maxLen) : str;
+            };
+
+            const validateNumber = (val: unknown): number | undefined => {
+                if (val === undefined || val === null) return undefined;
+                const num = Number(val);
+                return isNaN(num) ? undefined : Math.max(0, Math.floor(num));
+            };
+
+            // Sanitize inputs
+            const sanitizedArgs = {
+                id: validateString(toolArgs.id, 100),
+                title: validateString(toolArgs.title, 200),
+                date: validateString(toolArgs.date, 20),
+                startTime: validateString(toolArgs.startTime, 10),
+                endTime: validateString(toolArgs.endTime, 10),
+                startTimezone: validateString(toolArgs.startTimezone, 10),
+                endTimezone: validateString(toolArgs.endTimezone, 10),
+                location: validateString(toolArgs.location, 500),
+                description: validateString(toolArgs.description, 2000),
+                type: validateString(toolArgs.type, 50),
+                price: validateNumber(toolArgs.price),
+                amount: validateNumber(toolArgs.amount),
+                category: validateString(toolArgs.category, 50),
+                name: validateString(toolArgs.name, 200),
+                address: validateString(toolArgs.address, 500),
+            };
+
+            console.log(`AI Calling Tool: ${name}`, sanitizedArgs);
 
             let toolResult = { success: true, message: "" };
 
@@ -276,95 +329,95 @@ ${JSON.stringify(context.places, null, 2)}
 
                 if (name === "add_itinerary_item") {
                     // デフォルト
-                    const DEFAULT_OFFSET = "+09:00";
-                    const startTz = toolArgs.startTimezone || DEFAULT_OFFSET;
-                    const endTz = toolArgs.endTimezone || startTz || DEFAULT_OFFSET;
+                    const startTz = sanitizedArgs.startTimezone || DEFAULT_OFFSET;
+                    const endTz = sanitizedArgs.endTimezone || startTz || DEFAULT_OFFSET;
 
-                    const startTime = toolArgs.startTime ? `${toolArgs.date}T${toolArgs.startTime}:00${startTz}` : null;
-                    const endTime = toolArgs.endTime ? `${toolArgs.date}T${toolArgs.endTime}:00${endTz}` : null;
+                    const startTime = sanitizedArgs.startTime ? `${sanitizedArgs.date}T${sanitizedArgs.startTime}:00${startTz}` : null;
+                    const endTime = sanitizedArgs.endTime ? `${sanitizedArgs.date}T${sanitizedArgs.endTime}:00${endTz}` : null;
 
                     const { data: item, error } = await supabase.from("itinerary_items").insert({
                         trip_id: tripId,
-                        title: toolArgs.title,
-                        date: toolArgs.date,
+                        title: sanitizedArgs.title,
+                        date: sanitizedArgs.date,
                         start_time: startTime,
                         end_time: endTime,
                         start_timezone: startTz,
                         end_timezone: endTz,
-                        location: toolArgs.location,
-                        description: toolArgs.description,
-                        type: toolArgs.type || "activity",
+                        location: sanitizedArgs.location,
+                        description: sanitizedArgs.description,
+                        type: sanitizedArgs.type || "activity",
                         is_ai_generated: true
                     }).select().single();
 
                     if (error) throw error;
 
                     // 価格が指定されている場合、費用も登録
-                    if (toolArgs.price && toolArgs.price > 0) {
+                    if (sanitizedArgs.price && sanitizedArgs.price > 0) {
                         await supabase.from("expenses").insert({
                             trip_id: tripId,
-                            title: toolArgs.title,
-                            amount: toolArgs.price,
+                            title: sanitizedArgs.title,
+                            amount: sanitizedArgs.price,
                             currency: "JPY",
-                            amount_jpy: toolArgs.price,
-                            category: toolArgs.type || "other",
+                            amount_jpy: sanitizedArgs.price,
+                            category: sanitizedArgs.type || "other",
                             description: null,
-                            date: toolArgs.date,
+                            date: sanitizedArgs.date,
                             is_ai_generated: true
                         });
                     }
                 } else if (name === "add_expense") {
                     const { error } = await supabase.from("expenses").insert({
                         trip_id: tripId,
-                        title: toolArgs.title || toolArgs.description,
-                        amount: toolArgs.amount,
+                        title: sanitizedArgs.title || sanitizedArgs.description,
+                        amount: sanitizedArgs.amount,
                         currency: "JPY",
-                        amount_jpy: toolArgs.amount,
-                        description: toolArgs.description || null,
-                        category: toolArgs.category || "other",
-                        date: toolArgs.date,
+                        amount_jpy: sanitizedArgs.amount,
+                        description: sanitizedArgs.description || null,
+                        category: sanitizedArgs.category || "other",
+                        date: sanitizedArgs.date,
                         is_ai_generated: true
                     });
                     if (error) throw error;
                 } else if (name === "update_itinerary_item") {
-                    const updates: any = {
-                        title: toolArgs.title,
-                        date: toolArgs.date,
-                        location: toolArgs.location,
-                        description: toolArgs.description,
-                        type: toolArgs.type
+                    const updates: Record<string, unknown> = {
+                        title: sanitizedArgs.title,
+                        date: sanitizedArgs.date,
+                        location: sanitizedArgs.location,
+                        description: sanitizedArgs.description,
+                        type: sanitizedArgs.type
                     };
 
-                    const startTz = toolArgs.startTimezone || DEFAULT_OFFSET;
-                    const endTz = toolArgs.endTimezone || startTz || DEFAULT_OFFSET;
+                    const startTz = sanitizedArgs.startTimezone || DEFAULT_OFFSET;
+                    const endTz = sanitizedArgs.endTimezone || startTz || DEFAULT_OFFSET;
 
-                    if (toolArgs.date && toolArgs.startTime) {
-                        updates.start_time = `${toolArgs.date}T${toolArgs.startTime}:00${startTz}`;
+                    if (sanitizedArgs.date && sanitizedArgs.startTime) {
+                        updates.start_time = `${sanitizedArgs.date}T${sanitizedArgs.startTime}:00${startTz}`;
                         updates.start_timezone = startTz;
                     }
-                    if (toolArgs.date && toolArgs.endTime) {
-                        updates.end_time = `${toolArgs.date}T${toolArgs.endTime}:00${endTz}`;
+                    if (sanitizedArgs.date && sanitizedArgs.endTime) {
+                        updates.end_time = `${sanitizedArgs.date}T${sanitizedArgs.endTime}:00${endTz}`;
                         updates.end_timezone = endTz;
                     }
 
-                    const { error } = await supabase.from("itinerary_items").update(updates).eq("id", toolArgs.id);
+                    const { error } = await supabase.from("itinerary_items").update(updates).eq("id", sanitizedArgs.id);
                     if (error) throw error;
                 } else if (name === "delete_itinerary_item") {
-                    const { error } = await supabase.from("itinerary_items").delete().eq("id", toolArgs.id);
+                    const { error } = await supabase.from("itinerary_items").delete().eq("id", sanitizedArgs.id);
                     if (error) throw error;
                 } else if (name === "add_place") {
                     const { error } = await supabase.from("places").insert({
                         trip_id: tripId,
-                        name: toolArgs.name,
-                        address: toolArgs.address,
-                        notes: toolArgs.description,
+                        name: sanitizedArgs.name,
+                        address: sanitizedArgs.address,
+                        notes: sanitizedArgs.description,
                         is_ai_generated: true
                     });
                     if (error) throw error;
                 } else if (name === "delete_place") {
-                    const { error } = await supabase.from("places").delete().eq("id", toolArgs.id);
+                    const { error } = await supabase.from("places").delete().eq("id", sanitizedArgs.id);
                     if (error) throw error;
                 }
+
 
                 // ツール実行結果をAIにフィードバックして最終回答を得る
                 const toolResponse = await chat.sendMessage([{

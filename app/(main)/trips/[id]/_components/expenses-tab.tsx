@@ -31,6 +31,7 @@ import {
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { SettlementDialog } from "./settlement-dialog";
+import { validateLength, validateAmount, MAX_LENGTHS } from "@/lib/validation";
 
 interface ExpensesTabProps {
     tripId: string;
@@ -131,14 +132,38 @@ export function ExpensesTab({
     };
 
     const handleSubmit = async () => {
+        // Title validation
         if (!formData.title) {
             toast.error("タイトルを入力してください");
             return;
         }
-        if (!formData.amount || Number(formData.amount) <= 0) {
+        const titleValidation = validateLength(formData.title, MAX_LENGTHS.EXPENSE_TITLE, "タイトル");
+        if (!titleValidation.valid) {
+            toast.error(titleValidation.error);
+            return;
+        }
+
+        // Amount validation
+        const amount = Number(formData.amount);
+        if (!formData.amount || amount <= 0) {
             toast.error("金額を入力してください");
             return;
         }
+        const amountValidation = validateAmount(amount, "金額");
+        if (!amountValidation.valid) {
+            toast.error(amountValidation.error);
+            return;
+        }
+
+        // Description validation
+        if (formData.description) {
+            const descValidation = validateLength(formData.description, MAX_LENGTHS.EXPENSE_DESCRIPTION, "説明");
+            if (!descValidation.valid) {
+                toast.error(descValidation.error);
+                return;
+            }
+        }
+
         if (selectedMembers.length === 0) {
             toast.error("対象者を選択してください");
             return;

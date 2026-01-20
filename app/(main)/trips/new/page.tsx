@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "sonner";
 import type { Database } from "@/lib/supabase/types";
+import { validateLength, MAX_LENGTHS } from "@/lib/validation";
 
 type TripMemberInsert = Database["public"]["Tables"]["trip_members"]["Insert"];
 
@@ -34,7 +35,15 @@ export default function NewTripPage() {
 
     const addMember = () => {
         const trimmedName = currentName.trim();
-        if (trimmedName && !manualMembers.includes(trimmedName)) {
+        if (!trimmedName) return;
+
+        const validation = validateLength(trimmedName, MAX_LENGTHS.MEMBER_NAME, "メンバー名");
+        if (!validation.valid) {
+            toast.error(validation.error);
+            return;
+        }
+
+        if (!manualMembers.includes(trimmedName)) {
             setManualMembers([...manualMembers, trimmedName]);
             setCurrentName("");
         }
@@ -46,7 +55,15 @@ export default function NewTripPage() {
 
     const addDestination = () => {
         const trimmed = currentDestination.trim();
-        if (trimmed && !destinations.includes(trimmed)) {
+        if (!trimmed) return;
+
+        const validation = validateLength(trimmed, MAX_LENGTHS.DESTINATION, "目的地");
+        if (!validation.valid) {
+            toast.error(validation.error);
+            return;
+        }
+
+        if (!destinations.includes(trimmed)) {
             setDestinations([...destinations, trimmed]);
             setCurrentDestination("");
         }
@@ -58,6 +75,27 @@ export default function NewTripPage() {
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+
+        // Validate trip name
+        if (!name.trim()) {
+            toast.error("旅行名を入力してください");
+            return;
+        }
+        const nameValidation = validateLength(name, MAX_LENGTHS.TRIP_NAME, "旅行名");
+        if (!nameValidation.valid) {
+            toast.error(nameValidation.error);
+            return;
+        }
+
+        // Validate description if provided
+        if (description) {
+            const descValidation = validateLength(description, MAX_LENGTHS.TRIP_DESCRIPTION, "説明");
+            if (!descValidation.valid) {
+                toast.error(descValidation.error);
+                return;
+            }
+        }
+
         setLoading(true);
 
         const { data: { user } } = await supabase.auth.getUser();
