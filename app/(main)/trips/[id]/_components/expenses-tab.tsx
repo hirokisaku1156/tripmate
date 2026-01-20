@@ -23,7 +23,7 @@ import {
     SelectValue,
 } from "@/components/ui/select";
 import { toast } from "sonner";
-import { MoreHorizontal, Bot } from "lucide-react";
+import { MoreHorizontal, Bot, RefreshCw } from "lucide-react";
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -115,6 +115,11 @@ export function ExpensesTab({
         } finally {
             setRatesLoading(false);
         }
+    };
+
+    const handleRefreshRates = async () => {
+        await loadExchangeRates();
+        toast.success("為替レートを最新に更新しました");
     };
 
     // Calculate JPY amount
@@ -558,6 +563,15 @@ export function ExpensesTab({
                         onSettleAll={handleSettleAll}
                     />
                     <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={handleRefreshRates}
+                        disabled={ratesLoading}
+                    >
+                        <RefreshCw className={`h-3 w-3 mr-1 ${ratesLoading ? "animate-spin" : ""}`} />
+                        レート更新
+                    </Button>
+                    <Button
                         variant="ghost"
                         size="sm"
                         onClick={() => setShowSettled(!showSettled)}
@@ -633,7 +647,7 @@ export function ExpensesTab({
                                                     {formatCurrency(expense.amount, expense.currency as CurrencyCode)}
                                                 </p>
                                                 {expense.currency !== "JPY" && expense.amount_jpy && (
-                                                    <p className="text-[10px] text-muted-foreground whitespace-nowrap">
+                                                    <p className="text-xs font-semibold text-blue-600 whitespace-nowrap">
                                                         ≈ ¥{Math.round(expense.amount_jpy).toLocaleString()}
                                                     </p>
                                                 )}
