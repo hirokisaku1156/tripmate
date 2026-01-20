@@ -81,11 +81,12 @@ export function getCurrencySymbol(code: CurrencyCode): string {
  */
 export function formatCurrency(amount: number, currencyCode: CurrencyCode): string {
     const symbol = getCurrencySymbol(currencyCode);
+    const prefix = currencyCode === "JPY" ? "" : `${currencyCode} `;
 
     // Special formatting for currencies without decimals
     if (["JPY", "KRW", "VND"].includes(currencyCode)) {
-        return `${symbol}${Math.round(amount).toLocaleString()}`;
+        return `${prefix}${symbol}${Math.round(amount).toLocaleString()}`;
     }
 
-    return `${symbol}${amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    return `${prefix}${symbol}${amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }

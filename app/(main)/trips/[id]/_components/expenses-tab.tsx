@@ -420,7 +420,7 @@ export function ExpensesTab({
                                             <SelectContent>
                                                 {CURRENCIES.map((curr) => (
                                                     <SelectItem key={curr.code} value={curr.code}>
-                                                        {curr.code}
+                                                        {curr.code} ({curr.name})
                                                     </SelectItem>
                                                 ))}
                                             </SelectContent>
@@ -441,7 +441,7 @@ export function ExpensesTab({
                                                 <span className="text-muted-foreground">レート取得中...</span>
                                             ) : jpyAmount ? (
                                                 <span className="text-green-600 font-medium">
-                                                    ≈ ¥{jpyAmount.toLocaleString()}
+                                                    ≈ ¥{jpyAmount.toLocaleString()} (日本円)
                                                 </span>
                                             ) : (
                                                 <Button

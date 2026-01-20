@@ -77,7 +77,7 @@ export function SettlementDialog({
                     {/* 合計 */}
                     <div className="text-center p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
                         <p className="text-sm text-muted-foreground">合計金額</p>
-                        <p className="text-2xl font-bold">¥{totalAmount.toLocaleString()}</p>
+                        <p className="text-2xl font-bold">¥{totalAmount.toLocaleString()} <span className="text-sm font-normal text-muted-foreground">(日本円)</span></p>
                     </div>
 
                     {/* 各メンバーの収支 */}
@@ -100,6 +100,7 @@ export function SettlementDialog({
                                 >
                                     {b.balance > 0 ? "+" : ""}
                                     ¥{b.balance.toLocaleString()}
+                                    <span className="text-[10px] ml-1 font-normal">(JPY)</span>
                                 </span>
                             </div>
                         ))}
@@ -127,7 +128,7 @@ export function SettlementDialog({
                                                 <span className="font-medium">{s.to.displayName}</span>
                                             </div>
                                             <span className="font-bold">
-                                                ¥{s.amount.toLocaleString()}
+                                                ¥{s.amount.toLocaleString()} <span className="text-[10px] font-normal text-muted-foreground">(JPY)</span>
                                             </span>
                                         </div>
                                     </CardContent>
