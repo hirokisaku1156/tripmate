@@ -273,28 +273,14 @@ export function ExpensesTab({
     return (
         <div className="space-y-4">
             {/* ヘッダー */}
-            <div className="flex items-center justify-between">
-                <div>
-                    <h3 className="font-semibold">費用管理</h3>
-                    <p className="text-sm text-muted-foreground">
-                        未精算合計: ¥{totalUnsettledAmount.toLocaleString()}
-                    </p>
-                </div>
-                <div className="flex gap-2">
-                    <SettlementDialog
-                        tripName="旅行"
-                        expenses={unsettledExpenseData}
-                        members={memberData}
-                        onSettleAll={handleSettleAll}
-                    />
-                    <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => setShowSettled(!showSettled)}
-                        className="text-xs text-muted-foreground"
-                    >
-                        {showSettled ? "📑 精算済を隠す" : "📑 精算済を出す"}
-                    </Button>
+            <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                    <div>
+                        <h3 className="font-semibold">費用管理</h3>
+                        <p className="text-sm text-muted-foreground">
+                            未精算合計: ¥{totalUnsettledAmount.toLocaleString()}
+                        </p>
+                    </div>
                     <Dialog open={open} onOpenChange={(val) => {
                         setOpen(val);
                         if (!val) {
@@ -324,6 +310,7 @@ export function ExpensesTab({
                                 setSelectedMembers(members.map((m) => m.id));
                             }}>+ 支払い追加</Button>
                         </DialogTrigger>
+
                         <DialogContent>
                             <DialogHeader>
                                 <DialogTitle>{editExpenseId ? "支払いを編集" : "支払いを登録"}</DialogTitle>
@@ -447,6 +434,23 @@ export function ExpensesTab({
                         </DialogContent>
                     </Dialog>
                 </div>
+                {/* 精算・フィルターボタン行 */}
+                <div className="flex flex-wrap gap-2">
+                    <SettlementDialog
+                        tripName="旅行"
+                        expenses={unsettledExpenseData}
+                        members={memberData}
+                        onSettleAll={handleSettleAll}
+                    />
+                    <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setShowSettled(!showSettled)}
+                        className="text-xs text-muted-foreground"
+                    >
+                        {showSettled ? "📑 精算済を隠す" : "📑 精算済を表示"}
+                    </Button>
+                </div>
             </div>
 
             {/* 支払い一覧 */}
@@ -466,7 +470,7 @@ export function ExpensesTab({
                                 (s) => s.expense_id === expense.id
                             );
                             return (
-                                <Card key={expense.id}>
+                                <Card key={expense.id} className={expense.is_settled ? "bg-green-50/50 dark:bg-green-900/10 border-green-200 dark:border-green-800" : ""}>
                                     <CardContent className="py-3">
                                         <div className="flex items-center justify-between">
                                             <div className="flex items-center gap-3">
@@ -498,7 +502,9 @@ export function ExpensesTab({
                                                             </Badge>
                                                         )}
                                                         {expense.is_settled && (
-                                                            <Badge variant="secondary" className="text-[10px] py-0 h-4 bg-gray-100 text-gray-500">精算済</Badge>
+                                                            <Badge className="text-[10px] py-0 h-5 bg-green-500 hover:bg-green-500 text-white">
+                                                                ✓ 精算済
+                                                            </Badge>
                                                         )}
                                                     </div>
                                                     <p className="text-sm text-muted-foreground">

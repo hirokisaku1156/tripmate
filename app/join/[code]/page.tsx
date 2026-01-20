@@ -17,6 +17,7 @@ function JoinPageContent({ params }: JoinPageProps) {
     const [trip, setTrip] = useState<{ id: string; name: string; description: string | null } | null>(null);
     const [targetMember, setTargetMember] = useState<{ id: string; display_name_override: string | null } | null>(null);
     const [currentUserName, setCurrentUserName] = useState<string | null>(null);
+    const [isLoggedIn, setIsLoggedIn] = useState<boolean | null>(null);
     const [loading, setLoading] = useState(true);
     const [joining, setJoining] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -32,6 +33,7 @@ function JoinPageContent({ params }: JoinPageProps) {
 
             // 現在のユーザー情報を取得
             const { data: { user } } = await supabase.auth.getUser();
+            setIsLoggedIn(!!user);
             if (user) {
                 const { data: profile } = await supabase
                     .from("profiles")
@@ -199,13 +201,45 @@ function JoinPageContent({ params }: JoinPageProps) {
                             <p className="text-sm text-muted-foreground">{trip.description}</p>
                         )}
                     </div>
-                    <Button
-                        onClick={handleJoin}
-                        className="w-full bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700"
-                        disabled={joining}
-                    >
-                        {joining ? "参加中..." : "この旅行に参加する"}
-                    </Button>
+
+                    {/* 未ログインの場合 */}
+                    {isLoggedIn === false && (
+                        <div className="p-4 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg">
+                            <p className="text-sm text-amber-700 dark:text-amber-300 text-center mb-3">
+                                参加するにはログインが必要です
+                            </p>
+                            <div className="flex gap-2">
+                                <Button
+                                    onClick={handleJoin}
+                                    className="flex-1 bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700"
+                                    disabled={joining}
+                                >
+                                    {joining ? "移動中..." : "ログインして参加"}
+                                </Button>
+                            </div>
+                            <p className="text-xs text-center text-muted-foreground mt-2">
+                                アカウントをお持ちでない場合は
+                                <Link
+                                    href={`/signup?redirect=${encodeURIComponent(token ? `/join/${code}?token=${token}` : `/join/${code}`)}`}
+                                    className="text-blue-600 hover:underline ml-1"
+                                >
+                                    新規登録
+                                </Link>
+                            </p>
+                        </div>
+                    )}
+
+                    {/* ログイン済みの場合 */}
+                    {isLoggedIn === true && (
+                        <Button
+                            onClick={handleJoin}
+                            className="w-full bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700"
+                            disabled={joining}
+                        >
+                            {joining ? "参加中..." : "この旅行に参加する"}
+                        </Button>
+                    )}
+
                     <p className="text-center text-sm text-muted-foreground">
                         <Link href="/trips" className="text-blue-600 hover:underline">
                             キャンセルして戻る

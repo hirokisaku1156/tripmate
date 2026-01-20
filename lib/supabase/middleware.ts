@@ -41,7 +41,9 @@ export async function updateSession(request: NextRequest) {
 
     if (!user && !isAuthPage && !isJoinPage && request.nextUrl.pathname !== "/") {
         const url = request.nextUrl.clone();
+        const redirectUrl = request.nextUrl.pathname + request.nextUrl.search;
         url.pathname = "/login";
+        url.searchParams.set("redirect", redirectUrl);
         return NextResponse.redirect(url);
     }
 

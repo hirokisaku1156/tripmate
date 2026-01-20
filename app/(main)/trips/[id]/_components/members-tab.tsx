@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
-import { MoreHorizontal } from "lucide-react";
+import { MoreHorizontal, User } from "lucide-react";
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -197,10 +197,11 @@ export function MembersTab({ tripId, members, inviteCode, isOwner }: MembersTabP
                                 <div key={member.id} className="flex flex-col gap-2 p-3 rounded-lg border bg-card text-card-foreground">
                                     <div className="flex items-center gap-3">
                                         <Avatar className="h-8 w-8">
-                                            <AvatarFallback className="bg-gradient-to-br from-blue-500 to-indigo-600 text-white text-xs">
-                                                {displayName.charAt(0)}
+                                            <AvatarFallback className="bg-gradient-to-br from-blue-500 to-indigo-600 text-white">
+                                                <User className="h-4 w-4" />
                                             </AvatarFallback>
                                         </Avatar>
+
                                         <div className="flex-1">
                                             <div className="flex items-center gap-2">
                                                 <span className="font-medium">{displayName}</span>
