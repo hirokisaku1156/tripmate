@@ -42,6 +42,8 @@ export function TodoTab({ tripId, todos, memos, members, currentMemberId }: Todo
     const [activeTab, setActiveTab] = useState("todos");
     const [todoDialogOpen, setTodoDialogOpen] = useState(false);
     const [memoDialogOpen, setMemoDialogOpen] = useState(false);
+    const [memoDetailOpen, setMemoDetailOpen] = useState(false);
+    const [selectedMemo, setSelectedMemo] = useState<Memo | null>(null);
     const [loading, setLoading] = useState(false);
 
     // Edit states
@@ -241,9 +243,16 @@ export function TodoTab({ tripId, todos, memos, members, currentMemberId }: Todo
         if (error) toast.error("削除に失敗しました");
         else {
             toast.success("削除しました");
+            setMemoDetailOpen(false);
             router.refresh();
         }
     };
+
+    const handleOpenMemoDetail = (memo: Memo) => {
+        setSelectedMemo(memo);
+        setMemoDetailOpen(true);
+    };
+
 
     // Helpers
     const getAssigneeNames = (memberIds: string[] | null) => {
@@ -407,18 +416,24 @@ export function TodoTab({ tripId, todos, memos, members, currentMemberId }: Todo
                                             </DropdownMenuContent>
                                         </DropdownMenu>
                                     </div>
-                                    <CardHeader className="p-4 pb-2">
-                                        <CardTitle className="text-base leading-tight pr-6">{memo.title}</CardTitle>
-                                        <CardDescription className="text-xs">
-                                            {new Date(memo.created_at).toLocaleDateString("ja-JP")}
-                                        </CardDescription>
-                                    </CardHeader>
-                                    <CardContent className="p-4 pt-2">
-                                        <p className="text-sm text-muted-foreground whitespace-pre-wrap line-clamp-4">
-                                            {memo.content}
-                                        </p>
-                                    </CardContent>
+                                    <div
+                                        className="cursor-pointer"
+                                        onClick={() => handleOpenMemoDetail(memo)}
+                                    >
+                                        <CardHeader className="p-4 pb-2">
+                                            <CardTitle className="text-base leading-tight pr-6 hover:text-blue-600 transition-colors">{memo.title}</CardTitle>
+                                            <CardDescription className="text-xs">
+                                                {new Date(memo.created_at).toLocaleDateString("ja-JP")}
+                                            </CardDescription>
+                                        </CardHeader>
+                                        <CardContent className="p-4 pt-2">
+                                            <p className="text-sm text-muted-foreground whitespace-pre-wrap line-clamp-4">
+                                                {memo.content}
+                                            </p>
+                                        </CardContent>
+                                    </div>
                                 </Card>
+
                             ))}
                         </div>
                     )}
@@ -516,6 +531,49 @@ export function TodoTab({ tripId, todos, memos, members, currentMemberId }: Todo
                     </form>
                 </DialogContent>
             </Dialog>
+
+            {/* Memo Detail Dialog */}
+            <Dialog open={memoDetailOpen} onOpenChange={setMemoDetailOpen}>
+                <DialogContent className="max-w-lg">
+                    <DialogHeader>
+                        <DialogTitle className="text-lg">{selectedMemo?.title}</DialogTitle>
+                        <p className="text-xs text-muted-foreground">
+                            {selectedMemo && new Date(selectedMemo.created_at).toLocaleDateString("ja-JP", {
+                                year: "numeric",
+                                month: "long",
+                                day: "numeric",
+                            })}
+                        </p>
+                    </DialogHeader>
+                    <div className="max-h-[60vh] overflow-y-auto">
+                        <p className="text-sm whitespace-pre-wrap leading-relaxed">
+                            {selectedMemo?.content || "(内容なし)"}
+                        </p>
+                    </div>
+                    <DialogFooter className="flex gap-2 sm:gap-0">
+                        <Button
+                            variant="outline"
+                            onClick={() => {
+                                if (selectedMemo) {
+                                    setMemoDetailOpen(false);
+                                    handleOpenMemoDialog(selectedMemo);
+                                }
+                            }}
+                        >
+                            <Edit2 className="h-4 w-4 mr-2" /> 編集
+                        </Button>
+                        <Button
+                            variant="destructive"
+                            onClick={() => {
+                                if (selectedMemo) handleDeleteMemo(selectedMemo.id);
+                            }}
+                        >
+                            <Trash2 className="h-4 w-4 mr-2" /> 削除
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </div>
+
     );
 }

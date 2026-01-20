@@ -388,7 +388,8 @@ export function ItineraryTab({ tripId, items, members, currentMemberId, tripStar
                 setDialogOpen(true);
                 toast.success("スクショを解析しました！内容を確認してください。");
             } catch (error) {
-                toast.error("情報の解析に失敗しました");
+                const errorMessage = error instanceof Error ? error.message : "情報の解析に失敗しました";
+                toast.error(errorMessage);
             } finally {
                 setAnalysisLoading(false);
                 // Reset input

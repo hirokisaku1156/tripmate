@@ -40,11 +40,21 @@ export async function analyzeFlightScreenshot(base64Image: string) {
         const response = result.response.text();
         // JSON以外のテキストが含まれている可能性を考慮してクリーニング
         const jsonMatch = response.match(/\{[\s\S]*\}/);
-        if (!jsonMatch) throw new Error("Could not parse JSON from response");
+        if (!jsonMatch) throw new Error("Could not parse JSON from response: " + response);
 
         return JSON.parse(jsonMatch[0]);
-    } catch (error) {
-        console.error("Analysis error:", error);
-        throw new Error("画像の解析に失敗しました");
+    } catch (error: unknown) {
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        console.error("Analysis error:", errorMessage);
+
+        // Return specific error for debugging
+        if (errorMessage.includes("quota") || errorMessage.includes("RESOURCE_EXHAUSTED")) {
+            throw new Error("API制限に達しました。しばらくお待ちください。");
+        }
+        if (errorMessage.includes("INVALID_ARGUMENT")) {
+            throw new Error("画像形式が無効です。PNG/JPEGをお試しください。");
+        }
+        throw new Error("画像の解析に失敗しました: " + errorMessage);
     }
 }
+
