@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
@@ -33,6 +33,9 @@ export function TripListClient({ trips }: TripListClientProps) {
     const router = useRouter();
     const supabase = createClient();
     const [showPastTrips, setShowPastTrips] = useState(true);
+    const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+    const [joinCode, setJoinCode] = useState("");
+    const [joining, setJoining] = useState(false);
 
     // Edit/Delete state
     const [editDialogOpen, setEditDialogOpen] = useState(false);
@@ -54,6 +57,22 @@ export function TripListClient({ trips }: TripListClientProps) {
     const isEnded = (trip: TripData) => {
         if (!trip.end_date) return false;
         return new Date(trip.end_date) < today;
+    };
+
+    useEffect(() => {
+        const getUserId = async () => {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (user) setCurrentUserId(user.id);
+        };
+        getUserId();
+    }, [supabase]);
+
+    const handleJoinByCode = async () => {
+        const trimmedCode = joinCode.trim();
+        if (!trimmedCode) return;
+
+        setJoining(true);
+        router.push(`/join/${trimmedCode}`);
     };
 
     const filteredTrips = showPastTrips
@@ -358,6 +377,54 @@ export function TripListClient({ trips }: TripListClientProps) {
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
+
+            {/* 下部パネル: 自分のIDとコードで参加 */}
+            <div className="mt-12 pt-6 border-t border-gray-200 dark:border-gray-800 space-y-6">
+                <Card className="bg-blue-50/30 dark:bg-blue-900/10 border-blue-100 dark:border-blue-900">
+                    <CardHeader className="py-4">
+                        <CardTitle className="text-sm">招待コードで参加</CardTitle>
+                    </CardHeader>
+                    <CardContent className="pb-4">
+                        <div className="flex gap-2">
+                            <Input
+                                placeholder="例: DFxDGXfz"
+                                value={joinCode}
+                                onChange={(e) => setJoinCode(e.target.value)}
+                                className="bg-white dark:bg-gray-950"
+                            />
+                            <Button
+                                onClick={handleJoinByCode}
+                                disabled={joining || !joinCode.trim()}
+                                className="bg-blue-600 hover:bg-blue-700 text-white shrink-0"
+                            >
+                                {joining ? "確認中..." : "参加する"}
+                            </Button>
+                        </div>
+                    </CardContent>
+                </Card>
+
+                <div className="px-2">
+                    <Label className="text-[10px] text-muted-foreground uppercase mb-1 block">あなたのユーザーID（友達に紐付けてもらう場合）</Label>
+                    <div className="flex items-center gap-2">
+                        <div className="flex-1 p-2 bg-gray-50 dark:bg-gray-800/50 rounded text-[10px] font-mono truncate border italic text-muted-foreground">
+                            {currentUserId || "読み込み中..."}
+                        </div>
+                        {currentUserId && (
+                            <Button
+                                size="sm"
+                                variant="ghost"
+                                className="h-8 text-[10px]"
+                                onClick={() => {
+                                    navigator.clipboard.writeText(currentUserId);
+                                    toast.success("ユーザーIDをコピーしました");
+                                }}
+                            >
+                                📋 コピー
+                            </Button>
+                        )}
+                    </div>
+                </div>
+            </div>
         </>
     );
 }
