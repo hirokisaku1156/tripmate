@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -35,12 +35,23 @@ export function MembersTab({ tripId, members, inviteCode, isOwner }: MembersTabP
     const [loading, setLoading] = useState(false);
     const [newName, setNewName] = useState("");
     const [editMemberId, setEditMemberId] = useState<string | null>(null);
+    const [linkDialogOpen, setLinkDialogOpen] = useState(false);
+    const [targetUserId, setTargetUserId] = useState("");
+    const [currentUserId, setCurrentUserId] = useState<string | null>(null);
     const router = useRouter();
     const supabase = createClient();
 
     const inviteLink = typeof window !== "undefined"
         ? `${window.location.origin}/join/${inviteCode}?openExternalBrowser=1`
         : "";
+
+    useEffect(() => {
+        const getUserId = async () => {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (user) setCurrentUserId(user.id);
+        };
+        getUserId();
+    }, [supabase]);
 
     const copyInviteLink = async (url: string = inviteLink) => {
         setCopying(true);
@@ -76,6 +87,28 @@ export function MembersTab({ tripId, members, inviteCode, isOwner }: MembersTabP
             setDialogOpen(false);
             setEditMemberId(null);
             setNewName("");
+            router.refresh();
+        }
+        setLoading(false);
+    };
+
+    const handleLinkById = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!editMemberId || !targetUserId.trim()) return;
+
+        setLoading(true);
+        const { error } = await supabase
+            .from("trip_members")
+            .update({ user_id: targetUserId.trim() })
+            .eq("id", editMemberId);
+
+        if (error) {
+            toast.error("紐付けに失敗しました。IDが正しいか確認してください", { description: error.message });
+        } else {
+            toast.success("メンバーを紐付けました！");
+            setLinkDialogOpen(false);
+            setEditMemberId(null);
+            setTargetUserId("");
             router.refresh();
         }
         setLoading(false);
@@ -178,6 +211,28 @@ export function MembersTab({ tripId, members, inviteCode, isOwner }: MembersTabP
                             💬 LINE
                         </Button>
                     </div>
+
+                    {currentUserId && (
+                        <div className="pt-2 border-t">
+                            <Label className="text-[10px] text-muted-foreground uppercase mb-1 block">あなたのユーザーID（友達に教えて紐付けてもらう場合）</Label>
+                            <div className="flex items-center gap-2">
+                                <div className="flex-1 p-2 bg-gray-100 dark:bg-gray-800 rounded text-[10px] font-mono truncate border italic">
+                                    {currentUserId}
+                                </div>
+                                <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    className="h-8 text-[10px]"
+                                    onClick={() => {
+                                        navigator.clipboard.writeText(currentUserId);
+                                        toast.success("ユーザーIDをコピーしました");
+                                    }}
+                                >
+                                    📋 コピー
+                                </Button>
+                            </div>
+                        </div>
+                    )}
                 </CardContent>
             </Card>
 
@@ -229,6 +284,15 @@ export function MembersTab({ tripId, members, inviteCode, isOwner }: MembersTabP
                                                     }}>
                                                         ✏️ 編集
                                                     </DropdownMenuItem>
+                                                    {isManual && (
+                                                        <DropdownMenuItem onClick={() => {
+                                                            setEditMemberId(member.id);
+                                                            setTargetUserId("");
+                                                            setLinkDialogOpen(true);
+                                                        }}>
+                                                            🔗 IDで紐付け
+                                                        </DropdownMenuItem>
+                                                    )}
                                                     <DropdownMenuItem
                                                         className="text-red-600 focus:text-red-600"
                                                         onClick={() => handleDeleteMember(member.id, displayName)}
@@ -270,6 +334,33 @@ export function MembersTab({ tripId, members, inviteCode, isOwner }: MembersTabP
                     </div>
                 </CardContent>
             </Card>
+
+            {/* ID紐付けダイアログ */}
+            <Dialog open={linkDialogOpen} onOpenChange={setLinkDialogOpen}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>ユーザーIDで紐付け</DialogTitle>
+                        <DialogDescription>
+                            友達から教えてもらったユーザーID（UUID）を入力してください。この手動メンバーがそのユーザーのアカウントと紐付けられます。
+                        </DialogDescription>
+                    </DialogHeader>
+                    <form onSubmit={handleLinkById} className="space-y-4 pt-4">
+                        <div className="space-y-2">
+                            <Label htmlFor="userId">ユーザーID</Label>
+                            <Input
+                                id="userId"
+                                value={targetUserId}
+                                onChange={(e) => setTargetUserId(e.target.value)}
+                                placeholder="例: 12345678-abcd-efgh-..."
+                                required
+                            />
+                        </div>
+                        <Button type="submit" className="w-full" disabled={loading}>
+                            {loading ? "紐付け中..." : "紐付ける"}
+                        </Button>
+                    </form>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 }
