@@ -33,7 +33,8 @@ async function listMixedUsers() {
     members?.forEach(m => {
         const id = m.user_id || "GUEST";
         const name = m.display_name_override || (id === "GUEST" ? "Guest/Manual" : "Registered User");
-        const trip = m.trips?.name || "Unknown Trip";
+        const tripData = Array.isArray(m.trips) ? m.trips[0] : m.trips;
+        const trip = tripData?.name || "Unknown Trip";
 
         if (!userMap.has(id)) {
             userMap.set(id, { id, names: new Set(), trips: new Set(), firstSeen: m.joined_at });
